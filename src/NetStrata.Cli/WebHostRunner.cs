@@ -22,6 +22,7 @@ public static class WebHostRunner
         var builder = WebApplication.CreateBuilder(args);
         builder.WebHost.UseUrls($"http://localhost:{options.Port}");
 
+        builder.Services.AddSingleton<ISampleStorage>(storage);
         builder.Services.AddSingleton(storage);
         builder.Services.AddSingleton(seriesBuilder);
         builder.Services.AddSingleton(collector);

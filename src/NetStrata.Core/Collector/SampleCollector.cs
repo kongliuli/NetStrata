@@ -12,6 +12,7 @@ public sealed class CollectOptions
 {
     public IReadOnlyList<string> PingExtra { get; init; } = [];
     public string? ProxyOverride { get; init; }
+    public bool WithDownload { get; init; }
 }
 
 public sealed class SampleCollector
@@ -24,6 +25,8 @@ public sealed class SampleCollector
     private readonly ProxyDetector _proxyDetector;
     private readonly ProxyConfigProbe _proxyConfigProbe;
     private readonly ProxyEgressProbe _proxyEgressProbe = new();
+    private readonly CaptiveProbe _captiveProbe = new();
+    private readonly ProxyDownloadProbe _proxyDownloadProbe = new();
     private readonly ISystemProxyReader _registryReader;
     private readonly VerdictEngine _verdictEngine = new();
 
@@ -73,12 +76,18 @@ public sealed class SampleCollector
 
         var dnsTask = _dnsProbe.ProbeAsync(ct);
         var httpsTask = _httpsProbe.ProbeTargetsAsync(httpsTargets, proxyUrl, ct);
-        await Task.WhenAll(dnsTask, httpsTask, wifiTask);
+        var captiveTask = _captiveProbe.ProbeAsync(ct);
+        await Task.WhenAll(dnsTask, httpsTask, wifiTask, captiveTask);
 
         var proxyConfig = _proxyConfigProbe.Probe(proxyUrl, systemProxy);
         ProxyEgress? proxyEgress = null;
+        ProxyDownload? proxyDownload = null;
         if (proxyUrl is not null && proxyConfig.Listening)
+        {
             proxyEgress = await _proxyEgressProbe.ProbeAsync(proxyUrl, ct);
+            if (options.WithDownload)
+                proxyDownload = await _proxyDownloadProbe.ProbeAsync(proxyUrl, ct);
+        }
 
         sw.Stop();
 
@@ -92,7 +101,9 @@ public sealed class SampleCollector
             Pings = pingResults,
             Https = await httpsTask,
             ProxyConfig = proxyConfig,
-            ProxyEgress = proxyEgress
+            ProxyEgress = proxyEgress,
+            Captive = await captiveTask,
+            ProxyDownload = proxyDownload
         };
 
         return partial with { Verdict = _verdictEngine.Judge(partial) };

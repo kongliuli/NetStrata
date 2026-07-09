@@ -36,10 +36,12 @@ public sealed class ProbeDaemon : BackgroundService
 
             try
             {
+                var withDownload = _options.DownloadEvery > 0 && _cycle % _options.DownloadEvery == 0;
                 var sample = await _collector.CollectAsync(new CollectOptions
                 {
                     PingExtra = _options.PingExtra,
-                    ProxyOverride = _options.ProxyOverride
+                    ProxyOverride = _options.ProxyOverride,
+                    WithDownload = withDownload
                 }, ct);
 
                 await _storage.AppendAsync(sample, ct);

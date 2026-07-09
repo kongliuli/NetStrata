@@ -108,7 +108,7 @@ netstrata --once
 
 ---
 
-## Phase 3：Daemon + Web 仪表盘（进行中）
+## Phase 3：Daemon + Web 仪表盘 ✅
 
 **目标**：`netstrata --web` 持续监控 + 浏览器仪表盘。
 
@@ -120,8 +120,8 @@ netstrata --once
 - [x] `SeriesBuilder` — 时序数据聚合（含 custom_* ping）
 - [x] 基础 `web/index.html` 前端
 - [x] `NETSTRATA_INTERVAL_MS` / `NETSTRATA_PORT` / `NETSTRATA_NO_OPEN`
-- [ ] `CaptiveProbe`
-- [ ] `ProxyDownloadProbe`（每 N 轮）
+- [x] `CaptiveProbe`
+- [x] `ProxyDownloadProbe`（每 N 轮）
 - [x] 日志 `logs/daemon.log`
 
 ### 验收标准

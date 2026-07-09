@@ -31,6 +31,12 @@ public sealed record Sample
     [JsonPropertyName("proxyEgress")]
     public ProxyEgress? ProxyEgress { get; init; }
 
+    [JsonPropertyName("captive")]
+    public CaptiveResult? Captive { get; init; }
+
+    [JsonPropertyName("proxyDownload")]
+    public ProxyDownload? ProxyDownload { get; init; }
+
     [JsonPropertyName("verdict")]
     public Verdict? Verdict { get; init; }
 }

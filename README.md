@@ -76,7 +76,7 @@ netstrata
 - [x] Layer 3 / 测试先行 / 自定义 Ping 规格
 - [x] Phase 1 MVP（`netstrata --once`）
 - [x] Phase 2 Windows 平台适配
-- [ ] Phase 3 Web 仪表盘 + Daemon
+- [x] Phase 3 Web 仪表盘 + Daemon
 - [ ] Phase 4 TUI + 增强功能
 
 ## 许可证

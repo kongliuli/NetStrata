@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using NetStrata.Core.Collector;
 using NetStrata.Core.Config;
 using NetStrata.Core.Storage;
+using NetStrata.Cli;
 
 if (args.Contains("--once"))
 {
