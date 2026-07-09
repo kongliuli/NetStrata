@@ -108,21 +108,21 @@ netstrata --once
 
 ---
 
-## Phase 3：Daemon + Web 仪表盘
+## Phase 3：Daemon + Web 仪表盘（进行中）
 
 **目标**：`netstrata --web` 持续监控 + 浏览器仪表盘。
 
 ### 任务
 
-- [ ] `ProbeDaemon` — BackgroundService 循环
-- [ ] `SampleStorage` — samples.jsonl 追加 + state.json
-- [ ] `NetStrata.Web` — /api/state, /api/samples, /api/series
-- [ ] `SeriesBuilder` — 时序数据聚合
-- [ ] 移植/适配 `web/index.html` 前端
-- [ ] `NETSTRATA_INTERVAL_MS` / `NETSTRATA_PORT` / `NETSTRATA_NO_OPEN`
+- [x] `ProbeDaemon` — BackgroundService 循环
+- [x] `SampleStorage` — samples.jsonl 追加 + state.json
+- [x] Web API — /api/state, /api/samples, /api/series（托管于 Cli）
+- [x] `SeriesBuilder` — 时序数据聚合（含 custom_* ping）
+- [x] 基础 `web/index.html` 前端
+- [x] `NETSTRATA_INTERVAL_MS` / `NETSTRATA_PORT` / `NETSTRATA_NO_OPEN`
 - [ ] `CaptiveProbe`
 - [ ] `ProxyDownloadProbe`（每 N 轮）
-- [ ] 日志 `logs/daemon.log`
+- [x] 日志 `logs/daemon.log`
 
 ### 验收标准
 

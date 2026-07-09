@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NetStrata</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 1.5rem; background: #0f1115; color: #e8eaed; }
+    h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+    #headline { color: #9aa0a6; margin-bottom: 1rem; }
+    .layers { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.5rem; }
+    .layer { padding: 0.75rem; border-radius: 8px; background: #1a1d24; border: 1px solid #2d323c; }
+    .layer.ok { border-color: #34a853; }
+    .layer.fail { border-color: #ea4335; }
+    .layer.degraded { border-color: #fbbc04; }
+    .layer.skipped { border-color: #5f6368; opacity: 0.7; }
+    #meta { margin-top: 1rem; font-size: 0.85rem; color: #9aa0a6; }
+  </style>
+</head>
+<body>
+  <h1>NetStrata <span id="overall"></span></h1>
+  <div id="headline">Loading…</div>
+  <div class="layers" id="layers"></div>
+  <div id="meta"></div>
+  <script>
+    async function refresh() {
+      try {
+        const state = await fetch('/api/state').then(r => r.ok ? r.json() : null);
+        if (!state?.latest?.verdict) {
+          document.getElementById('headline').textContent = 'Waiting for first sample…';
+          return;
+        }
+        const v = state.latest.verdict;
+        document.getElementById('overall').textContent = v.overall;
+        document.getElementById('headline').textContent = v.headline;
+        document.getElementById('layers').innerHTML = v.layers.map(l =>
+          `<div class="layer ${l.state}"><strong>${l.layer}</strong><br>${l.state}</div>`
+        ).join('');
+        document.getElementById('meta').textContent =
+          `cycle ${state.cycle} · ${state.latest.t} · ${state.latest.cycleMs?.toFixed?.(0) ?? state.latest.cycleMs}ms`;
+      } catch (e) {
+        document.getElementById('headline').textContent = 'Error: ' + e.message;
+      }
+    }
+    refresh();
+    setInterval(refresh, 5000);
+  </script>
+</body>
+</html>
