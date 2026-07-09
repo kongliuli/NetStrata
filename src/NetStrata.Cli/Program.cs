@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using NetStrata.Core.Collector;
 using NetStrata.Core.Config;
 using NetStrata.Core.Judge;
@@ -144,6 +145,7 @@ file static class JsonOptions
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        WriteIndented = false
+        WriteIndented = false,
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver()
     };
 }
