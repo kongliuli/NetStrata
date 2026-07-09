@@ -15,7 +15,7 @@
     .layer.fail { border-color: #ea4335; }
     .layer.degraded { border-color: #fbbc04; }
     .layer.skipped { border-color: #5f6368; opacity: 0.7; }
-    #meta { margin-top: 1rem; font-size: 0.85rem; color: #9aa0a6; }
+    #proxy { margin-top: 0.75rem; font-size: 0.85rem; color: #bdc1c6; }
   </style>
 </head>
 <body>
@@ -23,6 +23,7 @@
   <div id="alerts"></div>
   <div id="headline">Loading…</div>
   <div class="layers" id="layers"></div>
+  <div id="proxy"></div>
   <div id="meta"></div>
   <script>
     async function refresh() {
@@ -46,6 +47,18 @@
         document.getElementById('layers').innerHTML = v.layers.map(l =>
           `<div class="layer ${l.state}"><strong>${l.layer}</strong><br>${l.state}</div>`
         ).join('');
+        const pc = state.latest.proxyConfig || {};
+        const sp = pc.systemProxy || {};
+        const proxyBits = [];
+        if (pc.proxyUrl) proxyBits.push(`proxy ${pc.proxyUrl}`);
+        proxyBits.push(pc.listening ? 'listening' : 'not listening');
+        if (pc.listenerProcess) proxyBits.push(pc.listenerProcess);
+        const sysBits = [];
+        if (sp.httpEnable && sp.httpProxy) sysBits.push(`http ${sp.httpProxy}:${sp.httpPort ?? 80}`);
+        if (sp.httpsEnable && sp.httpsProxy) sysBits.push(`https ${sp.httpsProxy}:${sp.httpsPort ?? 443}`);
+        if (sp.socksEnable && sp.socksProxy) sysBits.push(`socks ${sp.socksProxy}:${sp.socksPort ?? 1080}`);
+        document.getElementById('proxy').textContent =
+          proxyBits.join(' · ') + (sysBits.length ? ' · system ' + sysBits.join(', ') : '');
         document.getElementById('meta').textContent =
           `cycle ${state.cycle} · ${state.latest.t} · ${state.latest.cycleMs?.toFixed?.(0) ?? state.latest.cycleMs}ms`;
       } catch (e) {

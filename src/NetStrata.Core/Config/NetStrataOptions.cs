@@ -8,6 +8,8 @@ public sealed class NetStrataOptions
     public int Port { get; init; } = 8787;
     public string? ProxyOverride { get; init; }
     public IReadOnlyList<string> PingExtra { get; init; } = [];
+    public IReadOnlyDictionary<string, string> PingExtraLabels { get; init; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     public IReadOnlyList<string> TlsStackTargets { get; init; } = [];
     public string Lang { get; init; } = "auto";
     public int DownloadEvery { get; init; } = 10;
@@ -26,6 +28,7 @@ public sealed class NetStrataOptions
             Port = ParseInt(Environment.GetEnvironmentVariable("NETSTRATA_PORT"), 8787),
             ProxyOverride = NormalizeProxyOverride(Environment.GetEnvironmentVariable("NETSTRATA_PROXY")),
             PingExtra = pingExtra,
+            PingExtraLabels = config.PingExtraLabels,
             TlsStackTargets = config.TlsStackTargets,
             Lang = Environment.GetEnvironmentVariable("NETSTRATA_LANG") ?? "auto",
             DownloadEvery = ParseInt(Environment.GetEnvironmentVariable("NETSTRATA_DOWNLOAD_EVERY"), 10),
@@ -38,19 +41,12 @@ public sealed class NetStrataOptions
     public static IReadOnlyList<string> MergePingExtra(
         IReadOnlyList<string> fromConfig,
         string? fromEnv,
-        IReadOnlyList<string>? fromCli = null)
-    {
-        var merged = new List<string>();
-        foreach (var t in fromConfig.Concat(ParseList(fromEnv)).Concat(fromCli ?? []))
-        {
-            if (string.IsNullOrWhiteSpace(t) || merged.Contains(t, StringComparer.OrdinalIgnoreCase))
-                continue;
-            if (merged.Count >= 10)
-                break;
-            merged.Add(t.Trim());
-        }
-        return merged;
-    }
+        IReadOnlyList<string>? fromCli = null,
+        Action<string>? onSkip = null) =>
+        PingTargetValidator.Filter(
+            fromConfig.Concat(ParseList(fromEnv)).Concat(fromCli ?? []),
+            max: 10,
+            onSkip);
 
     private static string? NormalizeProxyOverride(string? value)
     {

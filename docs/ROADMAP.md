@@ -236,15 +236,17 @@ gantt
 
 ## 技术债务备忘
 
-| 项 | 说明 | 处理阶段 |
-|----|------|----------|
-| HTTPS 时序分段 | Phase 1 仅 totalMs | Phase 2+ |
-| SOCKS5 代理 | 仅 HTTP 代理 | 按需 |
-| IPv6 支持 | 仅 IPv4 | 按需 |
-| 多网卡 VPN 干扰 | 默认路由选择 | Phase 2 |
-| 前端 systemProxy 字段 | 与 canireach scutil 差异 | Phase 3 |
-| Layer 3 TLS 探测精度 | 部分环境需 Integration 测试 | Phase 5a |
-| 自定义 ping 滥用 | 上限 10 + 不参与 verdict | Phase 2.5 |
+> **状态已同步至 [TECH-DEBT.md](TECH-DEBT.md)**（2026-07）：下列项均已处理或已隔离，详见该文档。
+
+| 项 | 状态 | 说明 |
+|----|------|------|
+| HTTPS 时序分段 | ✅ 已改善 | `dnsMs` / `connectMs` / `tlsMs` / `firstByteMs` |
+| SOCKS5 代理 | ✅ 基础支持 | 环境变量、注册表 `socks=`、1080 回退 |
+| IPv6 支持 | ✅ 基础支持 | `iface.ipv6`、IPv6 ping 校验 |
+| 多网卡 VPN 干扰 | ✅ 已改善 | VPN 网卡降权 + `routeHints` |
+| 前端 systemProxy | ✅ 已补齐 | `web/index.html` 展示代理摘要 |
+| Layer 3 TLS 精度 | ✅ 已隔离 | Integration Trait，默认 `dotnet test` 跳过 |
+| 自定义 ping 滥用 | ✅ 已加固 | 校验 + 上限 10 + 标签 + 不参与 verdict |
 
 ---
 
@@ -253,6 +255,7 @@ gantt
 1. **文档先行** — 改行为先改 `docs/`，见 [LAYER3.md](LAYER3.md)、[TESTING.md](TESTING.md)
 2. **测试先行** — 先写 `tests/` 失败用例，再实现
 3. **最小 PR** — 每个 Phase 可独立合并
+4. **调度文档** — Agent/CI 集成见 [SCHEDULING.md](SCHEDULING.md)、[USAGE.md](USAGE.md)
 
 ---
 

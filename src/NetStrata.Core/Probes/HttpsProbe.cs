@@ -47,35 +47,48 @@ public sealed class HttpsProbe : IProbe<IReadOnlyList<HttpsResult>>
         string? proxyUrl,
         CancellationToken ct)
     {
-        using var client = CreateClient(proxyUrl);
         var results = new List<HttpsResult>();
         foreach (var target in targets)
-            results.Add(await ProbeOneAsync(client, target, ct));
+            results.Add(await ProbeOneAsync(target, proxyUrl, ct));
         return results;
     }
 
-    private HttpClient CreateClient(string? proxyUrl)
+    private async Task<HttpsResult> ProbeOneAsync(HttpTarget target, string? proxyUrl, CancellationToken ct)
     {
-        var handler = new SocketsHttpHandler
-        {
-            UseProxy = proxyUrl is not null,
-            Proxy = proxyUrl is not null ? new WebProxy(proxyUrl) : null,
-            ConnectTimeout = _timeout,
-            AutomaticDecompression = DecompressionMethods.All
-        };
-        return new HttpClient(handler) { Timeout = _timeout };
-    }
-
-    private async Task<HttpsResult> ProbeOneAsync(HttpClient client, HttpTarget target, CancellationToken ct)
-    {
-        var sw = Stopwatch.StartNew();
+        var totalSw = Stopwatch.StartNew();
         var uri = new Uri(target.Url);
+
+        var dnsMs = 0.0;
+        string? remoteIp = null;
+        var dnsSw = Stopwatch.StartNew();
+        try
+        {
+            var addrs = await Dns.GetHostAddressesAsync(uri.Host, ct);
+            remoteIp = addrs.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork)?.ToString()
+                       ?? addrs.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetworkV6)?.ToString();
+        }
+        catch
+        {
+            // dnsMs still recorded
+        }
+        dnsMs = dnsSw.Elapsed.TotalMilliseconds;
+
+        var connectMs = 0.0;
+        using var handler = CreateHandler(proxyUrl, ms => connectMs = ms);
+        using var client = new HttpClient(handler) { Timeout = _timeout };
+
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Head, target.Url);
+            var requestSw = Stopwatch.StartNew();
             using var response = await client.SendAsync(
                 request, HttpCompletionOption.ResponseHeadersRead, ct);
-            sw.Stop();
+            requestSw.Stop();
+            totalSw.Stop();
+
+            var firstByteMs = requestSw.Elapsed.TotalMilliseconds;
+            // ponytail: HttpClient hides TLS handshake instant; remainder after TCP connect approximates TLS+TTFB
+            var tlsMs = Math.Max(0, firstByteMs - connectMs);
 
             var ok = target.AcceptAnyCode
                 ? response.StatusCode > 0
@@ -89,44 +102,72 @@ public sealed class HttpsProbe : IProbe<IReadOnlyList<HttpsResult>>
                 Via = target.Via,
                 Ok = ok,
                 HttpCode = (int)response.StatusCode,
-                RemoteIp = await TryResolveRemoteIp(uri.Host, ct),
-                TotalMs = sw.Elapsed.TotalMilliseconds,
+                RemoteIp = remoteIp,
+                DnsMs = dnsMs,
+                ConnectMs = connectMs,
+                TlsMs = tlsMs,
+                FirstByteMs = firstByteMs,
+                TotalMs = totalSw.Elapsed.TotalMilliseconds,
                 TimedOut = false
             };
         }
         catch (TaskCanceledException)
         {
-            sw.Stop();
-            return Fail(target, sw, timedOut: true, "timeout");
+            totalSw.Stop();
+            return Fail(target, totalSw.Elapsed.TotalMilliseconds, dnsMs, connectMs, timedOut: true, "timeout");
         }
         catch (Exception ex)
         {
-            sw.Stop();
-            return Fail(target, sw, timedOut: false, ex.Message);
+            totalSw.Stop();
+            return Fail(target, totalSw.Elapsed.TotalMilliseconds, dnsMs, connectMs, timedOut: false, ex.Message);
         }
     }
 
-    private static HttpsResult Fail(HttpTarget target, Stopwatch sw, bool timedOut, string err) => new()
+    private static SocketsHttpHandler CreateHandler(string? proxyUrl, Action<double> onConnectMs)
+    {
+        var handler = new SocketsHttpHandler
+        {
+            UseProxy = proxyUrl is not null,
+            Proxy = proxyUrl is not null ? new WebProxy(proxyUrl) : null,
+            ConnectTimeout = TimeSpan.FromSeconds(8),
+            AutomaticDecompression = DecompressionMethods.All,
+            ConnectCallback = async (context, token) =>
+            {
+                var sw = Stopwatch.StartNew();
+                var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+                try
+                {
+                    await socket.ConnectAsync(context.DnsEndPoint, token);
+                }
+                catch
+                {
+                    socket.Dispose();
+                    throw;
+                }
+
+                onConnectMs(sw.Elapsed.TotalMilliseconds);
+                return new NetworkStream(socket, ownsSocket: true);
+            }
+        };
+        return handler;
+    }
+
+    private static HttpsResult Fail(
+        HttpTarget target,
+        double totalMs,
+        double dnsMs,
+        double connectMs,
+        bool timedOut,
+        string err) => new()
     {
         Label = target.Label,
         Url = target.Url,
         Via = target.Via,
         Ok = false,
-        TotalMs = sw.Elapsed.TotalMilliseconds,
+        DnsMs = dnsMs,
+        ConnectMs = connectMs,
+        TotalMs = totalMs,
         TimedOut = timedOut,
         Err = err
     };
-
-    private static async Task<string?> TryResolveRemoteIp(string host, CancellationToken ct)
-    {
-        try
-        {
-            var addrs = await Dns.GetHostAddressesAsync(host, ct);
-            return addrs.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork)?.ToString();
-        }
-        catch
-        {
-            return null;
-        }
-    }
 }

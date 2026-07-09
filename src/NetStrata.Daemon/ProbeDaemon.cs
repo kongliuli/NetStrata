@@ -44,6 +44,7 @@ public sealed class ProbeDaemon : BackgroundService
                 var sample = await _collector.CollectAsync(new CollectOptions
                 {
                     PingExtra = _options.PingExtra,
+                    PingExtraLabels = _options.PingExtraLabels,
                     ProxyOverride = _options.ProxyOverride,
                     WithDownload = withDownload,
                     TlsStackTargets = _options.TlsStackTargets

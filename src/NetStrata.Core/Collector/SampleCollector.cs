@@ -11,6 +11,8 @@ namespace NetStrata.Core.Collector;
 public sealed class CollectOptions
 {
     public IReadOnlyList<string> PingExtra { get; init; } = [];
+    public IReadOnlyDictionary<string, string> PingExtraLabels { get; init; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     public IReadOnlyList<string> TlsStackTargets { get; init; } = [];
     public string? ProxyOverride { get; init; }
     public bool WithDownload { get; init; }
@@ -66,12 +68,15 @@ public sealed class SampleCollector
 
         var ping = new PingProbe(_pinger, options.PingExtra);
         var pingResults = new List<PingResult>();
-        var seen = new HashSet<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var customTargets = new HashSet<string>(options.PingExtra, StringComparer.OrdinalIgnoreCase);
         foreach (var target in pingTargets.Where(seen.Add))
         {
+            options.PingExtraLabels.TryGetValue(target, out var label);
             pingResults.Add(await ping.PingTargetAsync(
                 target,
-                custom: options.PingExtra.Contains(target),
+                custom: customTargets.Contains(target),
+                label: label,
                 ct: ct));
         }
 

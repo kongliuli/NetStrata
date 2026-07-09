@@ -33,7 +33,8 @@ NetStrata Web 模式在 `http://localhost:{PORT}` 提供本地 HTTP 服务。默
   "startedAt": "2026-07-09T02:58:31.760Z",
   "cycle": 42,
   "latest": { /* Sample */ },
-  "rolling": { /* 统计 */ }
+  "recentAlerts": [ /* Alert[], 最近 20 条 */ ],
+  "rolling": { "last20Overall": { "ok": 15, "degraded": 5 } }
 }
 ```
 
@@ -82,7 +83,7 @@ NetStrata Web 模式在 `http://localhost:{PORT}` 提供本地 HTTP 服务。默
 
 基于最近 N 条样本的规则引擎结论（`ConclusionEngine`）。Daemon 每 `NETSTRATA_CONCLUSION_EVERY` 轮（默认 30）更新 `data/conclusions.md`。规则见 [LAYER3.md](LAYER3.md#5-结论规则引擎phase-5c)。
 
-未实现时返回：
+无样本且无缓存时返回：
 
 ```markdown
 _(no conclusions yet)_

@@ -14,13 +14,15 @@ if (args.Contains("--once"))
     var pingExtra = NetStrataOptions.MergePingExtra(
         options.PingExtra,
         Environment.GetEnvironmentVariable("NETSTRATA_PING_EXTRA"),
-        ParsePingCli(args));
+        ParsePingCli(args),
+        msg => PingSkipLogger.Warn(msg));
 
     var collector = new SampleCollector();
     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
     var sample = await collector.CollectAsync(new CollectOptions
     {
         PingExtra = pingExtra,
+        PingExtraLabels = options.PingExtraLabels,
         ProxyOverride = options.ProxyOverride,
         TlsStackTargets = options.TlsStackTargets
     }, cts.Token);
@@ -82,10 +84,15 @@ if (args.Contains("-h") || args.Contains("--help"))
         Environment:
           NETSTRATA_PROXY               Force proxy URL; none/off to disable
           NETSTRATA_PING_EXTRA          Extra ping targets (comma-separated, max 10)
-          NETSTRATA_INTERVAL_MS         Refresh interval (default 60000)
+          NETSTRATA_INTERVAL_MS         Daemon interval ms (default 60000)
           NETSTRATA_PORT                Web port (default 8787)
           NETSTRATA_LANG                zh / en
+          NETSTRATA_DOWNLOAD_EVERY      Proxy download probe every N cycles
+          NETSTRATA_CONCLUSION_EVERY    Rewrite conclusions.md every N cycles
           NETSTRATA_NO_OPEN=1           Do not open browser in --web mode
+
+        Config: %APPDATA%\\NetStrata\\config.json
+        Docs:  docs/USAGE.md  docs/SCHEDULING.md
         """);
     return 0;
 }

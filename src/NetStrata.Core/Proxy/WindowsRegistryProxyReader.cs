@@ -15,32 +15,69 @@ public sealed class WindowsRegistryProxyReader : ISystemProxyReader
         var server = key.GetValue("ProxyServer") as string;
         var bypass = key.GetValue("ProxyOverride") as string;
 
-        ParseProxyServer(server, out var host, out var port);
+        ParseProxyServer(server, out var httpHost, out var httpPort, out var socksHost, out var socksPort);
 
         return new SystemProxySettings
         {
-            HttpEnable = enabled,
-            HttpProxy = host,
-            HttpPort = port,
-            HttpsEnable = enabled,
-            HttpsProxy = host,
-            HttpsPort = port,
+            HttpEnable = enabled && httpHost is not null,
+            HttpProxy = httpHost,
+            HttpPort = httpPort,
+            HttpsEnable = enabled && httpHost is not null,
+            HttpsProxy = httpHost,
+            HttpsPort = httpPort,
+            SocksEnable = enabled && socksHost is not null,
+            SocksProxy = socksHost,
+            SocksPort = socksPort,
             BypassList = bypass
         };
     }
 
-    private static void ParseProxyServer(string? server, out string? host, out int? port)
+    internal static void ParseProxyServer(
+        string? server,
+        out string? httpHost,
+        out int? httpPort,
+        out string? socksHost,
+        out int? socksPort)
     {
-        host = null;
-        port = null;
+        httpHost = null;
+        httpPort = null;
+        socksHost = null;
+        socksPort = null;
         if (string.IsNullOrWhiteSpace(server))
             return;
 
-        // http=host:port;https=host:port  or  host:port
-        var part = server.Split(';')[0];
-        if (part.Contains('='))
-            part = part.Split('=')[1];
+        foreach (var segment in server.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var part = segment.Trim();
+            if (part.Contains('='))
+            {
+                var kv = part.Split('=', 2);
+                var scheme = kv[0].Trim().ToLowerInvariant();
+                part = kv[1].Trim();
+                ParseHostPort(part, out var host, out var port);
+                if (scheme is "socks" or "socks5")
+                {
+                    socksHost = host;
+                    socksPort = port;
+                }
+                else if (scheme is "http" or "https")
+                {
+                    httpHost ??= host;
+                    httpPort ??= port;
+                }
+                continue;
+            }
 
+            ParseHostPort(part, out var h, out var p);
+            httpHost ??= h;
+            httpPort ??= p;
+        }
+    }
+
+    private static void ParseHostPort(string part, out string? host, out int? port)
+    {
+        host = null;
+        port = null;
         var idx = part.LastIndexOf(':');
         if (idx > 0 && int.TryParse(part[(idx + 1)..], out var p))
         {

@@ -16,7 +16,8 @@ public sealed class InterfaceProbe : IProbe<InterfaceInfo?>
         var ni = NetworkInterface.GetAllNetworkInterfaces()
             .Where(n => n.OperationalStatus == OperationalStatus.Up
                         && n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
-            .OrderBy(n => n.GetIPProperties().GatewayAddresses
+            .OrderBy(n => IsLikelyVpn(n) ? 1 : 0)
+            .ThenBy(n => n.GetIPProperties().GatewayAddresses
                 .Any(g => g.Address.AddressFamily == AddressFamily.InterNetwork) ? 0 : 1)
             .ThenBy(n => n.Name)
             .FirstOrDefault();
@@ -27,6 +28,10 @@ public sealed class InterfaceProbe : IProbe<InterfaceInfo?>
         var props = ni.GetIPProperties();
         var ipv4 = props.UnicastAddresses
             .FirstOrDefault(a => a.Address.AddressFamily == AddressFamily.InterNetwork)
+            ?.Address.ToString();
+        var ipv6 = props.UnicastAddresses
+            .FirstOrDefault(a => a.Address.AddressFamily == AddressFamily.InterNetworkV6
+                                  && !a.Address.IsIPv6LinkLocal)
             ?.Address.ToString();
         var gateway = props.GatewayAddresses
             .FirstOrDefault(g => g.Address.AddressFamily == AddressFamily.InterNetwork)
@@ -45,6 +50,7 @@ public sealed class InterfaceProbe : IProbe<InterfaceInfo?>
             HardwarePort = ni.Description,
             LinkType = linkType,
             Ipv4 = ipv4,
+            Ipv6 = ipv6,
             Gateway = gateway,
             SubnetMask = props.UnicastAddresses
                 .FirstOrDefault(a => a.Address.AddressFamily == AddressFamily.InterNetwork)
@@ -54,5 +60,16 @@ public sealed class InterfaceProbe : IProbe<InterfaceInfo?>
                 .Select(a => a.ToString())
                 .ToList()
         });
+    }
+
+    internal static bool IsLikelyVpn(NetworkInterface ni)
+    {
+        var name = ni.Name;
+        var desc = ni.Description;
+        return name.Contains("Tailscale", StringComparison.OrdinalIgnoreCase)
+               || desc.Contains("Tailscale", StringComparison.OrdinalIgnoreCase)
+               || desc.Contains("Wintun", StringComparison.OrdinalIgnoreCase)
+               || desc.Contains("WireGuard", StringComparison.OrdinalIgnoreCase)
+               || desc.Contains("TAP-", StringComparison.OrdinalIgnoreCase);
     }
 }

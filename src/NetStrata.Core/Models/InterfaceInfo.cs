@@ -19,6 +19,9 @@ public sealed record InterfaceInfo
     [JsonPropertyName("ipv4")]
     public string? Ipv4 { get; init; }
 
+    [JsonPropertyName("ipv6")]
+    public string? Ipv6 { get; init; }
+
     [JsonPropertyName("gateway")]
     public string? Gateway { get; init; }
 

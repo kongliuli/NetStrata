@@ -34,6 +34,35 @@ public sealed class ProxyDetectorTests
         Assert.Equal("http://127.0.0.1:7890", url);
     }
 
+    [Fact]
+    public void Detect_RegistrySocks_ReturnsSocks5Url()
+    {
+        var reader = new FakeRegistryReader(new SystemProxySettings
+        {
+            SocksEnable = true,
+            SocksProxy = "127.0.0.1",
+            SocksPort = 1080
+        });
+        var detector = new ProxyDetector(reader);
+        Assert.Equal("socks5://127.0.0.1:1080", detector.Detect(null));
+    }
+
+    [Fact]
+    public void Detect_SocksEnv_ReturnsSocks5Url()
+    {
+        var prev = Environment.GetEnvironmentVariable("ALL_PROXY");
+        Environment.SetEnvironmentVariable("ALL_PROXY", "127.0.0.1:1081");
+        try
+        {
+            var detector = new ProxyDetector(new FakeRegistryReader(new SystemProxySettings()));
+            Assert.Equal("socks5://127.0.0.1:1081", detector.Detect(null));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("ALL_PROXY", prev);
+        }
+    }
+
     private sealed class FakeRegistryReader(SystemProxySettings settings) : ISystemProxyReader
     {
         public SystemProxySettings Read() => settings;
