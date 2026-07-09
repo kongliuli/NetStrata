@@ -74,8 +74,7 @@ netstrata
 
 - [x] 产品命名与规格文档
 - [x] Layer 3 / 测试先行 / 自定义 Ping 规格
-- [ ] .NET 解决方案脚手架
-- [ ] Phase 1 MVP（Ping + DNS + HTTPS + Verdict）
+- [x] Phase 1 MVP（`netstrata --once`）
 - [ ] Phase 2 Windows 平台适配
 - [ ] Phase 3 Web 仪表盘 + Daemon
 - [ ] Phase 4 TUI + 增强功能

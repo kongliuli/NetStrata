@@ -13,7 +13,7 @@
 
 ---
 
-## Phase 1：核心探测 MVP（进行中）
+## Phase 1：核心探测 MVP ✅
 
 **目标**：`netstrata --once` 在 Windows 上输出正确 JSON。
 
@@ -21,14 +21,14 @@
 
 - [x] 创建 `NetStrata.sln` + 项目结构
 - [x] `Models/` — Sample、PingResult、HttpsResult、DnsResult、Verdict 等
-- [ ] `InterfaceProbe` — 网关、IPv4、linkType
-- [ ] `PingProbe` — 网关 + 4 个公网 IP
-- [ ] `DnsProbe` — 20 条矩阵（DnsClient NuGet）
-- [ ] `HttpsProbe` — 7 个直连目标，直连禁用代理
+- [x] `InterfaceProbe` — 网关、IPv4、linkType
+- [x] `PingProbe` — 网关 + 4 个公网 IP
+- [x] `DnsProbe` — 20 条矩阵（DnsClient NuGet）
+- [x] `HttpsProbe` — 7 个直连目标，直连禁用代理
 - [x] `VerdictEngine` — 完整 6 层判决 + overall + ai headline
-- [ ] `SampleCollector` — 并行调度
-- [ ] `NetStrata.Cli --once` — stdout JSON
-- [x] 单元测试：`VerdictEngine` 至少 5 个场景（当前 9 个）
+- [x] `SampleCollector` — 并行调度
+- [x] `NetStrata.Cli --once` — stdout JSON
+- [x] 单元测试：`VerdictEngine` 至少 5 个场景（当前 11 个）
 
 ### 验收标准
 

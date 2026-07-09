@@ -32,5 +32,5 @@ public sealed record Sample
     public ProxyEgress? ProxyEgress { get; init; }
 
     [JsonPropertyName("verdict")]
-    public Verdict? VerdictResult { get; init; }
+    public Verdict? Verdict { get; init; }
 }
