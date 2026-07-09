@@ -8,11 +8,11 @@ public sealed class AlertNotifierTests
     [Fact]
     public void DetectNew_ReturnsOnlyUnseenAlerts()
     {
-        var prev =
+        IReadOnlyList<Alert> prev =
         [
             new Alert { T = "1", Type = "route", Message = "old" }
         ];
-        var curr =
+        IReadOnlyList<Alert> curr =
         [
             new Alert { T = "1", Type = "route", Message = "old" },
             new Alert { T = "2", Type = "proxy", Message = "proxy down" }

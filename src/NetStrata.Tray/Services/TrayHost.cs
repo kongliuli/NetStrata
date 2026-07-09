@@ -21,7 +21,7 @@ internal sealed class TrayHost : IDisposable
     private readonly ToolStripMenuItem _daemonItem;
     private readonly ToolStripMenuItem _probeItem;
     private Views.DashboardWindow? _dashboard;
-    private readonly Views.SettingsWindow? _settings;
+    private Views.SettingsWindow? _settings;
     private readonly AlertWatchState _alerts = new();
     private bool _probing;
 
