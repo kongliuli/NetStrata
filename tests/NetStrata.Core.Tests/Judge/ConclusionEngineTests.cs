@@ -1,5 +1,5 @@
-using NetStrata.Core.Judge;
 using NetStrata.Core.Models;
+using NetStrata.Core.Judge;
 
 namespace NetStrata.Core.Tests.Judge;
 
@@ -49,6 +49,22 @@ public sealed class ConclusionEngineTests
 
         var md = _engine.GenerateMarkdown(samples);
         Assert.Contains("多次降级", md);
+    }
+
+    [Fact]
+    public void Generate_CustomPingFail_MentionsTarget()
+    {
+        var failing = SampleBuilder.Healthy() with
+        {
+            Pings = SampleBuilder.Healthy().Pings.Concat(
+            [
+                new PingResult { Target = "192.168.1.50", Label = "nas", Custom = true, Ok = false, AvgMs = 0 }
+            ]).ToList()
+        };
+        var samples = Enumerable.Repeat(failing, 3).ToList();
+        var md = _engine.GenerateMarkdown(samples);
+        Assert.Contains("nas", md);
+        Assert.Contains("192.168.1.50", md);
     }
 
     [Fact]

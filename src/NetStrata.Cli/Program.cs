@@ -2,6 +2,7 @@
 using System.Text.Json.Serialization;
 using NetStrata.Core.Collector;
 using NetStrata.Core.Config;
+using NetStrata.Core.Judge;
 using NetStrata.Core.Storage;
 using NetStrata.Cli;
 
@@ -34,6 +35,34 @@ if (args.Contains("--web") || args.Contains("-w"))
     return 0;
 }
 
+if (args.Contains("--export"))
+{
+    DataDirectory.EnsureExists();
+    var minutes = ParseIntCli(args, "--minutes", 60);
+    var format = ParseStringCli(args, "--format", "markdown");
+    var output = ParseStringCli(args, "-o") ?? ParseStringCli(args, "--output");
+
+    var storage = new JsonSampleStorage(options.DataDir);
+    var exporter = new ReportExporter();
+    var conclusions = new ConclusionEngine();
+
+    var samples = await storage.ReadTailAsync(Math.Max(240, minutes * 2), CancellationToken.None);
+    var state = await storage.ReadStateAsync(CancellationToken.None);
+    var conclusionsMd = await storage.ReadConclusionsAsync(CancellationToken.None)
+        ?? conclusions.GenerateMarkdown(samples);
+    var report = exporter.Build(samples, state?.RecentAlerts ?? [], conclusionsMd, minutes);
+    var content = (format ?? "markdown").Equals("json", StringComparison.OrdinalIgnoreCase)
+        ? exporter.ToJson(report)
+        : exporter.ToMarkdown(report);
+
+    if (!string.IsNullOrWhiteSpace(output))
+        await File.WriteAllTextAsync(output, content);
+    else
+        Console.Write(content);
+
+    return 0;
+}
+
 if (args.Contains("-h") || args.Contains("--help"))
 {
     Console.WriteLine("""
@@ -44,6 +73,7 @@ if (args.Contains("-h") || args.Contains("--help"))
           netstrata --follow              TUI reading daemon state.json only
           netstrata --once                Single probe, JSON to stdout
           netstrata --web                 Start dashboard + background daemon
+          netstrata --export -o report.md Export last 60 minutes to file
           netstrata --once --ping IP      Add extra ping targets (comma-separated)
           netstrata --help                Show this help
 
@@ -68,8 +98,28 @@ if (args.Length == 0 || args.Contains("--tui"))
     return 0;
 }
 
-Console.Error.WriteLine("netstrata: use --once, --web, --follow, or --help");
+Console.Error.WriteLine("netstrata: use --once, --web, --export, --follow, or --help");
 return 1;
+
+static int ParseIntCli(string[] args, string flag, int fallback)
+{
+    for (var i = 0; i < args.Length - 1; i++)
+    {
+        if (args[i] == flag && int.TryParse(args[i + 1], out var n))
+            return n;
+    }
+    return fallback;
+}
+
+static string? ParseStringCli(string[] args, string flag, string? fallback = null)
+{
+    for (var i = 0; i < args.Length - 1; i++)
+    {
+        if (args[i] == flag)
+            return args[i + 1];
+    }
+    return fallback;
+}
 
 static IReadOnlyList<string> ParsePingCli(string[] args)
 {

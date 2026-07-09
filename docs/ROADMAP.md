@@ -186,12 +186,12 @@ netstrata --web
 - [x] `state.recentAlerts` 持久化
 - [x] Web 横幅 + TUI 摘要
 
-### Phase 5c：结论与导出
+### Phase 5c：结论与导出（已完成）
 
-- [ ] `ConclusionEngine` + `/api/conclusions`
-- [ ] `data/conclusions.md` 周期性写入
-- [ ] `netstrata --export` + `GET /api/export`
-- [ ] 结论规则含自定义 ping 失败（R05）
+- [x] `ConclusionEngine` + `/api/conclusions`
+- [x] `data/conclusions.md` 周期性写入
+- [x] `netstrata --export` + `GET /api/export`
+- [x] 结论规则含自定义 ping 失败（R05）
 
 ### Phase 5d：系统托盘（可选）
 

@@ -28,6 +28,7 @@ public static class WebHostRunner
         builder.Services.AddSingleton(seriesBuilder);
         builder.Services.AddSingleton(collector);
         builder.Services.AddSingleton(new ConclusionEngine());
+        builder.Services.AddSingleton(new ReportExporter());
         builder.Services.AddSingleton(options);
         builder.Services.AddHostedService(sp => new ProbeDaemon(
             sp.GetRequiredService<SampleCollector>(),
@@ -64,6 +65,24 @@ public static class WebHostRunner
 
             var samples = await s.ReadTailAsync(60, ct);
             return Results.Text(engine.GenerateMarkdown(samples), "text/markdown");
+        });
+        app.MapGet("/api/export", async (
+            int? minutes,
+            string? format,
+            ISampleStorage s,
+            ReportExporter exporter,
+            ConclusionEngine engine,
+            CancellationToken ct) =>
+        {
+            var window = minutes ?? 60;
+            var samples = await s.ReadTailAsync(Math.Max(240, window * 2), ct);
+            var state = await s.ReadStateAsync(ct);
+            var conclusions = await s.ReadConclusionsAsync(ct) ?? engine.GenerateMarkdown(samples);
+            var report = exporter.Build(samples, state?.RecentAlerts ?? [], conclusions, window);
+
+            return string.Equals(format, "markdown", StringComparison.OrdinalIgnoreCase)
+                ? Results.Text(exporter.ToMarkdown(report), "text/markdown")
+                : Results.Text(exporter.ToJson(report), "application/json");
         });
 
         var url = $"http://localhost:{options.Port}";
