@@ -28,4 +28,13 @@ public static class StatusFormatter
                 l.Reasons.Count > 0 ? string.Join("; ", l.Reasons) : "-"))
             .ToList();
     }
+
+    public static string FormatAlerts(IReadOnlyList<Alert> alerts, string lang)
+    {
+        if (alerts.Count == 0)
+            return string.Empty;
+
+        var joined = string.Join(" · ", alerts.TakeLast(2).Select(a => a.Message));
+        return lang == "zh" ? $"告警: {joined}" : $"ALERT: {joined}";
+    }
 }

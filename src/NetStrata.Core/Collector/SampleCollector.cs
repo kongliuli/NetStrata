@@ -52,6 +52,8 @@ public sealed class SampleCollector
         var sw = Stopwatch.StartNew();
 
         var iface = await _interfaceProbe.ProbeAsync(ct);
+        if (iface is not null)
+            iface = iface with { RouteHints = RouteHintDetector.Detect() };
         var wifiTask = _wifiProbe.ProbeAsync(iface, ct);
         var systemProxy = _registryReader.Read();
         var proxyUrl = _proxyDetector.Detect(options.ProxyOverride);

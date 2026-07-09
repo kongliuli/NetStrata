@@ -178,13 +178,13 @@ netstrata --web
 - [x] `verdict.insights` 信息性条目
 - [x] 单元测试：TlsProbeTests
 
-### Phase 5b：告警与路由提示
+### Phase 5b：告警与路由提示（已完成）
 
-- [ ] `RouteWatch` — 网关/出口/网卡变化
-- [ ] `proxy_down` / `egress_flapping` 连续轮次规则
-- [ ] `iface.routeHints` 多默认路由 / Tailscale
-- [ ] `state.recentAlerts` 持久化
-- [ ] Web 横幅 + TUI 摘要
+- [x] `RouteWatch` — 网关/出口/网卡变化
+- [x] `proxy_down` / `egress_flapping` 连续轮次规则
+- [x] `iface.routeHints` 多默认路由 / Tailscale
+- [x] `state.recentAlerts` 持久化
+- [x] Web 横幅 + TUI 摘要
 
 ### Phase 5c：结论与导出
 

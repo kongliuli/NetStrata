@@ -8,6 +8,7 @@
     body { font-family: system-ui, sans-serif; margin: 1.5rem; background: #0f1115; color: #e8eaed; }
     h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
     #headline { color: #9aa0a6; margin-bottom: 1rem; }
+    #alerts { background: #3c2f1e; border: 1px solid #fbbc04; color: #fbbc04; padding: 0.5rem 0.75rem; border-radius: 6px; margin-bottom: 1rem; display: none; }
     .layers { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.5rem; }
     .layer { padding: 0.75rem; border-radius: 8px; background: #1a1d24; border: 1px solid #2d323c; }
     .layer.ok { border-color: #34a853; }
@@ -19,6 +20,7 @@
 </head>
 <body>
   <h1>NetStrata <span id="overall"></span></h1>
+  <div id="alerts"></div>
   <div id="headline">Loading…</div>
   <div class="layers" id="layers"></div>
   <div id="meta"></div>
@@ -33,6 +35,14 @@
         const v = state.latest.verdict;
         document.getElementById('overall').textContent = v.overall;
         document.getElementById('headline').textContent = v.headline;
+        const alerts = state.recentAlerts || [];
+        const banner = document.getElementById('alerts');
+        if (alerts.length) {
+          banner.style.display = 'block';
+          banner.textContent = alerts.slice(-3).map(a => a.message).join(' · ');
+        } else {
+          banner.style.display = 'none';
+        }
         document.getElementById('layers').innerHTML = v.layers.map(l =>
           `<div class="layer ${l.state}"><strong>${l.layer}</strong><br>${l.state}</div>`
         ).join('');

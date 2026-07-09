@@ -16,6 +16,8 @@ public sealed class ProbeDaemon : BackgroundService
     private readonly ConclusionEngine _conclusions = new();
     private readonly string _startedAt = DateTime.UtcNow.ToString("o");
     private int _cycle;
+    private Sample? _previous;
+    private IReadOnlyList<Alert> _recentAlerts = [];
 
     public ProbeDaemon(SampleCollector collector, ISampleStorage storage, NetStrataOptions options)
     {
@@ -47,7 +49,16 @@ public sealed class ProbeDaemon : BackgroundService
                     TlsStackTargets = _options.TlsStackTargets
                 }, ct);
 
+                var history = await _storage.ReadTailAsync(3, ct);
+                var compareAlerts = RouteWatch.Compare(_previous, sample);
+                var patternAlerts = RouteWatch.DetectPatterns(history.Append(sample).ToList());
+                var cycleAlerts = compareAlerts.Concat(patternAlerts).ToList();
+                if (cycleAlerts.Count > 0)
+                    sample = sample with { Alerts = cycleAlerts };
+
                 await _storage.AppendAsync(sample, ct);
+                _recentAlerts = RouteWatch.MergeRecent(_recentAlerts, cycleAlerts);
+                _previous = sample;
 
                 var recent = await _storage.ReadTailAsync(20, ct);
                 var rolling = new RollingStats
@@ -63,6 +74,7 @@ public sealed class ProbeDaemon : BackgroundService
                     StartedAt = _startedAt,
                     Cycle = _cycle,
                     Latest = sample,
+                    RecentAlerts = _recentAlerts,
                     Rolling = rolling
                 }, ct);
 

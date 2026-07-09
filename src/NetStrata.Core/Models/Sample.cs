@@ -43,6 +43,9 @@ public sealed record Sample
     [JsonPropertyName("tlsStack")]
     public IReadOnlyList<TlsStackResult>? TlsStack { get; init; }
 
+    [JsonPropertyName("alerts")]
+    public IReadOnlyList<Alert> Alerts { get; init; } = [];
+
     [JsonPropertyName("verdict")]
     public Verdict? Verdict { get; init; }
 }

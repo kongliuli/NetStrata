@@ -25,8 +25,8 @@ public static class TuiRunner
             {
                 while (session.Running && !ct.IsCancellationRequested)
                 {
-                    var sample = await LoadSampleAsync(storage, collector, options, followOnly, ct);
-                    ctx.UpdateTarget(Render(sample, session.Lang, options.IntervalMs));
+                    var (sample, alerts) = await LoadSampleAsync(storage, collector, options, followOnly, ct);
+                    ctx.UpdateTarget(Render(sample, alerts, session.Lang, options.IntervalMs));
                     ctx.Refresh();
 
                     if (!await WaitOrKeyAsync(options.IntervalMs, session, ct))
@@ -41,7 +41,7 @@ public static class TuiRunner
         public bool Running { get; set; } = true;
     }
 
-    private static async Task<Sample?> LoadSampleAsync(
+    private static async Task<(Sample? Sample, IReadOnlyList<Alert> Alerts)> LoadSampleAsync(
         ISampleStorage storage,
         SampleCollector collector,
         NetStrataOptions options,
@@ -50,19 +50,21 @@ public static class TuiRunner
     {
         var state = await storage.ReadStateAsync(ct);
         if (state?.Latest is not null)
-            return state.Latest;
+            return (state.Latest, state.RecentAlerts);
 
         if (followOnly)
-            return null;
+            return (null, []);
 
-        return await collector.CollectAsync(new CollectOptions
+        var sample = await collector.CollectAsync(new CollectOptions
         {
             PingExtra = options.PingExtra,
-            ProxyOverride = options.ProxyOverride
+            ProxyOverride = options.ProxyOverride,
+            TlsStackTargets = options.TlsStackTargets
         }, ct);
+        return (sample, sample.Alerts);
     }
 
-    private static Panel Render(Sample? sample, string lang, int intervalMs)
+    private static Panel Render(Sample? sample, IReadOnlyList<Alert> alerts, string lang, int intervalMs)
     {
         if (sample?.Verdict is null)
         {
@@ -82,15 +84,23 @@ public static class TuiRunner
             table.AddRow(layer, StatusFormatter.StateGlyph(state), Markup.Escape(detail));
 
         var ai = $"[bold]AI[/] {StatusFormatter.StateGlyph(v.Ai.State)} {Markup.Escape(v.Ai.Headline)}";
+        var alertLine = StatusFormatter.FormatAlerts(alerts, lang);
         var footer = lang == "zh"
             ? $"[grey]{sample.T} · {sample.CycleMs:F0}ms · 每 {intervalMs / 1000}s 刷新 · q 退出 · l 语言 · r 立即刷新[/]"
             : $"[grey]{sample.T} · {sample.CycleMs:F0}ms · refresh {intervalMs / 1000}s · q quit · l lang · r now[/]";
 
-        var content = new Rows(
-            new Markup(StatusFormatter.FormatHeader(v, lang)),
-            table,
-            new Markup(ai),
-            new Markup(footer));
+        var content = string.IsNullOrEmpty(alertLine)
+            ? new Rows(
+                new Markup(StatusFormatter.FormatHeader(v, lang)),
+                table,
+                new Markup(ai),
+                new Markup(footer))
+            : new Rows(
+                new Markup(StatusFormatter.FormatHeader(v, lang)),
+                table,
+                new Markup(ai),
+                new Markup($"[yellow]{Markup.Escape(alertLine)}[/]"),
+                new Markup(footer));
 
         return new Panel(content)
         {

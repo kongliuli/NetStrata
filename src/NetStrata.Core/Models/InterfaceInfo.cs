@@ -30,4 +30,7 @@ public sealed record InterfaceInfo
 
     [JsonPropertyName("dhcpDns")]
     public IReadOnlyList<string> DhcpDns { get; init; } = [];
+
+    [JsonPropertyName("routeHints")]
+    public IReadOnlyList<string> RouteHints { get; init; } = [];
 }
