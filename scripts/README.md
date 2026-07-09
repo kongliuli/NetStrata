@@ -16,6 +16,19 @@ powershell -NoProfile -File scripts\agent-loop.ps1
 
 与 Cursor 对话命令 `/loop 5m ...` 等效；本脚本便于 Windows 下无需手打 loop 语法。
 
+## agent-loop-wpf.ps1
+
+**用途**：WPF Phase W6 动态循环（每 5 分钟 wake）。
+
+```powershell
+powershell -NoProfile -File scripts\agent-loop-wpf.ps1
+```
+
+- 输出：`AGENT_LOOP_WAKE_netstrata_wpf {"prompt":"..."}`
+- Agent 正则：`^AGENT_LOOP_WAKE_netstrata_wpf`
+- 按 [docs/WPF-ROADMAP.md](../docs/WPF-ROADMAP.md) 推进 W6b→W6h
+
+
 ## health-check.ps1
 
 **用途**：CLI 式健康检查，供任务计划或 CI 调用。
