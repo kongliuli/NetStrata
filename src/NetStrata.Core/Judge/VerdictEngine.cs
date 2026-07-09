@@ -137,8 +137,17 @@ public sealed class VerdictEngine
 
             if (aliPing is null || !aliPing.Ok)
             {
-                bbState = LayerState.Fail;
-                bbReasons.Add("ping 223.5.5.5 fail");
+                // ponytail: Windows ICMP blocked but HTTPS works → degraded, not fail
+                if (baiduHttps is { Ok: true })
+                {
+                    bbState = Worse(bbState, LayerState.Degraded);
+                    bbReasons.Add("ping 223.5.5.5 fail (likely firewall), https ok");
+                }
+                else
+                {
+                    bbState = LayerState.Fail;
+                    bbReasons.Add("ping 223.5.5.5 fail");
+                }
             }
 
             if (baiduDns is not null && !baiduDns.Ok)

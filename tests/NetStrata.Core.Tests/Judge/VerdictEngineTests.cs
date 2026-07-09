@@ -58,6 +58,9 @@ public sealed class VerdictEngineTests
         {
             Pings = baseSample.Pings
                 .Select(p => p.Target == "223.5.5.5" ? p with { Ok = false, LossPct = 100 } : p)
+                .ToList(),
+            Https = baseSample.Https
+                .Select(h => h.Label == "baidu_direct" ? h with { Ok = false } : h)
                 .ToList()
         };
 
@@ -126,6 +129,22 @@ public sealed class VerdictEngineTests
         var verdict = _engine.Judge(sample);
         Assert.Equal("degraded", verdict.Overall);
         Assert.Equal("degraded", verdict.Layers.Single(l => l.Layer == "broadband").State);
+    }
+
+    [Fact]
+    public void Judge_PingFail_HttpsOk_BroadbandDegraded()
+    {
+        var baseSample = SampleBuilder.Healthy();
+        var sample = baseSample with
+        {
+            Pings = baseSample.Pings
+                .Select(p => p.Target == "223.5.5.5" ? p with { Ok = false, LossPct = 100 } : p)
+                .ToList()
+        };
+
+        var verdict = _engine.Judge(sample);
+        Assert.Equal("degraded", verdict.Layers.Single(l => l.Layer == "broadband").State);
+        Assert.Contains("firewall", verdict.Layers.Single(l => l.Layer == "broadband").Reasons[0]);
     }
 
     private static HttpsResult Https(string label, string via, bool ok) => new()

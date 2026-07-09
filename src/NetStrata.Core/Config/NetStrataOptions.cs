@@ -1,0 +1,72 @@
+namespace NetStrata.Core.Config;
+
+public sealed class NetStrataOptions
+{
+    public int IntervalMs { get; init; } = 60_000;
+    public int Port { get; init; } = 8787;
+    public string? ProxyOverride { get; init; }
+    public IReadOnlyList<string> PingExtra { get; init; } = [];
+    public string Lang { get; init; } = "auto";
+    public int DownloadEvery { get; init; } = 10;
+    public bool NoOpen { get; init; }
+    public string DataDir { get; init; } =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NetStrata", "data");
+    public string ConfigPath { get; init; } =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NetStrata", "config.json");
+
+    public static NetStrataOptions FromEnvironment()
+    {
+        var config = UserConfigLoader.Load(
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NetStrata", "config.json"));
+
+        var pingExtra = MergePingExtra(config.PingExtra, Environment.GetEnvironmentVariable("NETSTRATA_PING_EXTRA"));
+        return new NetStrataOptions
+        {
+            IntervalMs = ParseInt(Environment.GetEnvironmentVariable("NETSTRATA_INTERVAL_MS"), 60_000),
+            Port = ParseInt(Environment.GetEnvironmentVariable("NETSTRATA_PORT"), 8787),
+            ProxyOverride = NormalizeProxyOverride(Environment.GetEnvironmentVariable("NETSTRATA_PROXY")),
+            PingExtra = pingExtra,
+            Lang = Environment.GetEnvironmentVariable("NETSTRATA_LANG") ?? "auto",
+            DownloadEvery = ParseInt(Environment.GetEnvironmentVariable("NETSTRATA_DOWNLOAD_EVERY"), 10),
+            NoOpen = Environment.GetEnvironmentVariable("NETSTRATA_NO_OPEN") == "1",
+            DataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NetStrata", "data"),
+            ConfigPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NetStrata", "config.json")
+        };
+    }
+
+    public static IReadOnlyList<string> MergePingExtra(
+        IReadOnlyList<string> fromConfig,
+        string? fromEnv,
+        IReadOnlyList<string>? fromCli = null)
+    {
+        var merged = new List<string>();
+        foreach (var t in fromConfig.Concat(ParseList(fromEnv)).Concat(fromCli ?? []))
+        {
+            if (string.IsNullOrWhiteSpace(t) || merged.Contains(t, StringComparer.OrdinalIgnoreCase))
+                continue;
+            if (merged.Count >= 10)
+                break;
+            merged.Add(t.Trim());
+        }
+        return merged;
+    }
+
+    private static string? NormalizeProxyOverride(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+        var v = value.Trim();
+        return v.Equals("none", StringComparison.OrdinalIgnoreCase)
+               || v.Equals("off", StringComparison.OrdinalIgnoreCase)
+            ? "__disabled__"
+            : v;
+    }
+
+    private static int ParseInt(string? value, int fallback) =>
+        int.TryParse(value, out var n) ? n : fallback;
+
+    private static IReadOnlyList<string> ParseList(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? []
+            : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+}

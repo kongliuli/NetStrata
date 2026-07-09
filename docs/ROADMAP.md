@@ -81,13 +81,13 @@ netstrata --once | ConvertFrom-Json | Select-Object -Expand pings | Where-Object
 
 ### 任务
 
-- [ ] `ProxyDetector` — 环境变量 → 注册表 → WinHTTP → 端口扫描
-- [ ] `ProxyConfigProbe` — listening + listenerProcess
-- [ ] `HttpsProbe` 代理分支 — 6 个 proxy 目标
-- [ ] `ProxyEgressProbe` — ipify / ifconfig.me
+- [x] `ProxyDetector` — 环境变量 → 注册表 → 端口扫描（WinHTTP 待补）
+- [x] `ProxyConfigProbe` — listening + listenerProcess
+- [x] `HttpsProbe` 代理分支 — 6 个 proxy 目标
+- [x] `ProxyEgressProbe` — ipify / ifconfig.me
 - [ ] `WifiProbe` — netsh wlan show interfaces
-- [ ] Ping 防火墙修正 — ping fail + https ok → degraded
-- [ ] `NETSTRATA_PROXY` / 全部环境变量支持
+- [x] Ping 防火墙修正 — ping fail + https ok → degraded
+- [x] `NETSTRATA_PROXY` / `NETSTRATA_PING_EXTRA` 环境变量
 - [ ] 数据目录 `%APPDATA%\NetStrata\`
 
 ### 验收标准

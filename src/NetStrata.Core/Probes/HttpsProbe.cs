@@ -14,6 +14,16 @@ public sealed record HttpTarget(
 
 public sealed class HttpsProbe : IProbe<IReadOnlyList<HttpsResult>>
 {
+    public static readonly HttpTarget[] ProxyTargets =
+    [
+        new("google_proxy", "https://www.google.com", "proxy"),
+        new("cloudflare_proxy", "https://www.cloudflare.com", "proxy"),
+        new("github_proxy", "https://github.com", "proxy"),
+        new("youtube_proxy", "https://www.youtube.com", "proxy"),
+        new("anthropic_proxy", "https://api.anthropic.com/", "proxy", AcceptAnyCode: true),
+        new("openai_proxy", "https://api.openai.com/", "proxy", AcceptAnyCode: true)
+    ];
+
     public static readonly HttpTarget[] DirectTargets =
     [
         new("baidu_direct", "https://www.baidu.com", "direct"),
