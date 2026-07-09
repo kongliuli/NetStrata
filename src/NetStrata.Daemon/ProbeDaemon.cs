@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.Hosting;
 using NetStrata.Core.Collector;
 using NetStrata.Core.Config;
+using NetStrata.Core.Judge;
 using NetStrata.Core.Models;
 using NetStrata.Core.Storage;
 
@@ -12,6 +13,7 @@ public sealed class ProbeDaemon : BackgroundService
     private readonly SampleCollector _collector;
     private readonly ISampleStorage _storage;
     private readonly NetStrataOptions _options;
+    private readonly ConclusionEngine _conclusions = new();
     private readonly string _startedAt = DateTime.UtcNow.ToString("o");
     private int _cycle;
 
@@ -62,6 +64,12 @@ public sealed class ProbeDaemon : BackgroundService
                     Latest = sample,
                     Rolling = rolling
                 }, ct);
+
+                if (_options.ConclusionEvery > 0 && _cycle % _options.ConclusionEvery == 0)
+                {
+                    var window = await _storage.ReadTailAsync(60, ct);
+                    await _storage.WriteConclusionsAsync(_conclusions.GenerateMarkdown(window), ct);
+                }
 
                 Log($"cycle {_cycle} overall={sample.Verdict?.Overall} ms={sample.CycleMs:F0}");
             }

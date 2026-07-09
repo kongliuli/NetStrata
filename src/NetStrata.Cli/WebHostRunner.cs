@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using NetStrata.Core.Config;
 using NetStrata.Core.Collector;
+using NetStrata.Core.Judge;
 using NetStrata.Core.Storage;
 using NetStrata.Daemon;
 
@@ -26,6 +27,7 @@ public static class WebHostRunner
         builder.Services.AddSingleton(storage);
         builder.Services.AddSingleton(seriesBuilder);
         builder.Services.AddSingleton(collector);
+        builder.Services.AddSingleton(new ConclusionEngine());
         builder.Services.AddSingleton(options);
         builder.Services.AddHostedService(sp => new ProbeDaemon(
             sp.GetRequiredService<SampleCollector>(),
@@ -54,7 +56,15 @@ public static class WebHostRunner
             var samples = await s.ReadTailAsync(limit ?? 240, ct);
             return Results.Json(b.Build(samples));
         });
-        app.MapGet("/api/conclusions", () => Results.Text("_(no conclusions yet)_\n", "text/markdown"));
+        app.MapGet("/api/conclusions", async (ISampleStorage s, ConclusionEngine engine, CancellationToken ct) =>
+        {
+            var cached = await s.ReadConclusionsAsync(ct);
+            if (!string.IsNullOrWhiteSpace(cached))
+                return Results.Text(cached, "text/markdown");
+
+            var samples = await s.ReadTailAsync(60, ct);
+            return Results.Text(engine.GenerateMarkdown(samples), "text/markdown");
+        });
 
         var url = $"http://localhost:{options.Port}";
         Console.WriteLine($"dashboard: {url}");

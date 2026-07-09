@@ -18,6 +18,7 @@ TestResults/
 # Runtime data
 data/
 logs/
+artifacts/
 *.jsonl
 
 # OS

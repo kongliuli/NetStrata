@@ -141,19 +141,19 @@ netstrata --web
 
 ---
 
-## Phase 4：TUI + 增强
+## Phase 4：TUI + 增强（已完成）
 
 **目标**：终端面板 + 可选高级功能。
 
 ### 任务
 
-- [ ] `NetStrata.Tui` — Spectre.Console Live 面板
-- [ ] TUI follow 模式（读已有 daemon 的 jsonl）
-- [ ] 中英文切换（`l` 键 + `NETSTRATA_LANG`）
-- [ ] `TailscaleProbe`
-- [ ] `/api/conclusions` 规则引擎
-- [ ] 系统托盘图标（可选 WPF/WinForms）
-- [ ] 单文件发布 `netstrata.exe`
+- [x] TUI 默认模式 — Spectre.Console Live 面板（6 层 + AI）
+- [x] TUI `--follow` 模式（读 daemon state.json）
+- [x] 中英文切换（`l` 键 + `NETSTRATA_LANG`）
+- [x] `TailscaleProbe`
+- [x] `/api/conclusions` 规则引擎
+- [ ] 系统托盘图标（可选，推迟 Phase 5d）
+- [x] 单文件发布 `netstrata.exe`（trimmed ~19MB）
 
 ### 验收标准
 

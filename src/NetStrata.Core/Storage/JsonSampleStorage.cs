@@ -13,6 +13,7 @@ public sealed class JsonSampleStorage : ISampleStorage
 
     private readonly string _jsonlPath;
     private readonly string _statePath;
+    private readonly string _conclusionsPath;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
     public JsonSampleStorage(string? dataDir = null)
@@ -21,7 +22,10 @@ public sealed class JsonSampleStorage : ISampleStorage
         Directory.CreateDirectory(dir);
         _jsonlPath = Path.Combine(dir, "samples.jsonl");
         _statePath = Path.Combine(dir, "state.json");
+        _conclusionsPath = Path.Combine(dir, "conclusions.md");
     }
+
+    public string ConclusionsPath => _conclusionsPath;
 
     public async Task AppendAsync(Sample sample, CancellationToken ct)
     {
@@ -83,6 +87,35 @@ public sealed class JsonSampleStorage : ISampleStorage
         {
             var json = await File.ReadAllTextAsync(_statePath, ct);
             return JsonSerializer.Deserialize<DaemonState>(json, JsonOptions);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task WriteConclusionsAsync(string markdown, CancellationToken ct)
+    {
+        await _lock.WaitAsync(ct);
+        try
+        {
+            await File.WriteAllTextAsync(_conclusionsPath, markdown, ct);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task<string?> ReadConclusionsAsync(CancellationToken ct)
+    {
+        if (!File.Exists(_conclusionsPath))
+            return null;
+
+        await _lock.WaitAsync(ct);
+        try
+        {
+            return await File.ReadAllTextAsync(_conclusionsPath, ct);
         }
         finally
         {

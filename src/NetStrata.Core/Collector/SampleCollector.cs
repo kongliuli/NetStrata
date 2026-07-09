@@ -27,6 +27,7 @@ public sealed class SampleCollector
     private readonly ProxyEgressProbe _proxyEgressProbe = new();
     private readonly CaptiveProbe _captiveProbe = new();
     private readonly ProxyDownloadProbe _proxyDownloadProbe = new();
+    private readonly TailscaleProbe _tailscaleProbe = new();
     private readonly ISystemProxyReader _registryReader;
     private readonly VerdictEngine _verdictEngine = new();
 
@@ -77,7 +78,8 @@ public sealed class SampleCollector
         var dnsTask = _dnsProbe.ProbeAsync(ct);
         var httpsTask = _httpsProbe.ProbeTargetsAsync(httpsTargets, proxyUrl, ct);
         var captiveTask = _captiveProbe.ProbeAsync(ct);
-        await Task.WhenAll(dnsTask, httpsTask, wifiTask, captiveTask);
+        var tailscaleTask = _tailscaleProbe.ProbeAsync(ct);
+        await Task.WhenAll(dnsTask, httpsTask, wifiTask, captiveTask, tailscaleTask);
 
         var proxyConfig = _proxyConfigProbe.Probe(proxyUrl, systemProxy);
         ProxyEgress? proxyEgress = null;
@@ -103,7 +105,8 @@ public sealed class SampleCollector
             ProxyConfig = proxyConfig,
             ProxyEgress = proxyEgress,
             Captive = await captiveTask,
-            ProxyDownload = proxyDownload
+            ProxyDownload = proxyDownload,
+            Tailscale = await tailscaleTask
         };
 
         return partial with { Verdict = _verdictEngine.Judge(partial) };

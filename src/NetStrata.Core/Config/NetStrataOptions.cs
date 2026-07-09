@@ -10,6 +10,7 @@ public sealed class NetStrataOptions
     public IReadOnlyList<string> PingExtra { get; init; } = [];
     public string Lang { get; init; } = "auto";
     public int DownloadEvery { get; init; } = 10;
+    public int ConclusionEvery { get; init; } = 30;
     public bool NoOpen { get; init; }
     public string DataDir { get; init; } = DataDirectory.DataPath;
 
@@ -26,6 +27,7 @@ public sealed class NetStrataOptions
             PingExtra = pingExtra,
             Lang = Environment.GetEnvironmentVariable("NETSTRATA_LANG") ?? "auto",
             DownloadEvery = ParseInt(Environment.GetEnvironmentVariable("NETSTRATA_DOWNLOAD_EVERY"), 10),
+            ConclusionEvery = ParseInt(Environment.GetEnvironmentVariable("NETSTRATA_CONCLUSION_EVERY"), 30),
             NoOpen = Environment.GetEnvironmentVariable("NETSTRATA_NO_OPEN") == "1",
             DataDir = DataDirectory.DataPath
         };

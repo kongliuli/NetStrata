@@ -8,4 +8,6 @@ public interface ISampleStorage
     Task<IReadOnlyList<Sample>> ReadTailAsync(int limit, CancellationToken ct);
     Task WriteStateAsync(DaemonState state, CancellationToken ct);
     Task<DaemonState?> ReadStateAsync(CancellationToken ct);
+    Task WriteConclusionsAsync(string markdown, CancellationToken ct);
+    Task<string?> ReadConclusionsAsync(CancellationToken ct);
 }

@@ -37,6 +37,9 @@ public sealed record Sample
     [JsonPropertyName("proxyDownload")]
     public ProxyDownload? ProxyDownload { get; init; }
 
+    [JsonPropertyName("tailscale")]
+    public TailscaleInfo? Tailscale { get; init; }
+
     [JsonPropertyName("verdict")]
     public Verdict? Verdict { get; init; }
 }
