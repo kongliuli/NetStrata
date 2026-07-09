@@ -1,6 +1,6 @@
 # 开发路线图
 
-## Phase 0：文档 ✅（当前）
+## Phase 0：文档 ✅
 
 - [x] 产品命名 NetStrata
 - [x] 功能规格、数据模型、架构、Windows 对照、API、路线图
@@ -13,22 +13,22 @@
 
 ---
 
-## Phase 1：核心探测 MVP
+## Phase 1：核心探测 MVP（进行中）
 
 **目标**：`netstrata --once` 在 Windows 上输出正确 JSON。
 
 ### 任务
 
-- [ ] 创建 `NetStrata.sln` + 项目结构
-- [ ] `Models/` — Sample、PingResult、HttpsResult、DnsResult、Verdict 等
+- [x] 创建 `NetStrata.sln` + 项目结构
+- [x] `Models/` — Sample、PingResult、HttpsResult、DnsResult、Verdict 等
 - [ ] `InterfaceProbe` — 网关、IPv4、linkType
 - [ ] `PingProbe` — 网关 + 4 个公网 IP
 - [ ] `DnsProbe` — 20 条矩阵（DnsClient NuGet）
 - [ ] `HttpsProbe` — 7 个直连目标，直连禁用代理
-- [ ] `VerdictEngine` — 完整 6 层判决 + overall + ai headline
+- [x] `VerdictEngine` — 完整 6 层判决 + overall + ai headline
 - [ ] `SampleCollector` — 并行调度
 - [ ] `NetStrata.Cli --once` — stdout JSON
-- [ ] 单元测试：`VerdictEngine` 至少 5 个场景
+- [x] 单元测试：`VerdictEngine` 至少 5 个场景（当前 9 个）
 
 ### 验收标准
 
