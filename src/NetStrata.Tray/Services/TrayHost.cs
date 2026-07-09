@@ -17,6 +17,7 @@ internal sealed class TrayHost : IDisposable
     private readonly ContextMenuStrip _menu;
     private readonly ToolStripMenuItem _statusItem;
     private readonly ToolStripMenuItem _probeItem;
+    private Views.DashboardWindow? _dashboard;
     private bool _probing;
 
     public TrayHost(IOnceProbeRunner? probeRunner = null)
@@ -30,7 +31,8 @@ internal sealed class TrayHost : IDisposable
 
         _probeItem = new ToolStripMenuItem("立即探测 (--once)", null, (_, _) => _ = RunOnceAsync());
         _menu.Items.Add(_probeItem);
-        _menu.Items.Add("打开仪表盘", null, (_, _) => OpenDashboard());
+        _menu.Items.Add("打开 Dashboard", null, (_, _) => OpenWpfDashboard());
+        _menu.Items.Add("打开 Web 仪表盘", null, (_, _) => OpenWebDashboard());
         _menu.Items.Add("复制 headline", null, (_, _) => CopyHeadline());
         _menu.Items.Add(new ToolStripSeparator());
         _menu.Items.Add("退出", null, (_, _) => Shutdown());
@@ -106,7 +108,21 @@ internal sealed class TrayHost : IDisposable
         }
     }
 
-    private static void OpenDashboard()
+    private void OpenWpfDashboard()
+    {
+        if (_dashboard is { IsLoaded: true })
+        {
+            _dashboard.Activate();
+            _dashboard.Focus();
+            return;
+        }
+
+        _dashboard = new Views.DashboardWindow();
+        _dashboard.Closed += (_, _) => _dashboard = null;
+        _dashboard.Show();
+    }
+
+    private static void OpenWebDashboard()
     {
         var port = NetStrataOptions.FromEnvironment().Port;
         Process.Start(new ProcessStartInfo($"http://localhost:{port}") { UseShellExecute = true });
@@ -129,5 +145,6 @@ internal sealed class TrayHost : IDisposable
         _icon.Icon?.Dispose();
         _icon.Dispose();
         _menu.Dispose();
+        _dashboard?.Close();
     }
 }
