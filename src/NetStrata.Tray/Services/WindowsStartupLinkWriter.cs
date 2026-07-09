@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using NetStrata.Core.Tray;
 
 namespace NetStrata.Tray.Services;

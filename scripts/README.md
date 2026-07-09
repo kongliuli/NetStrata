@@ -28,6 +28,15 @@ powershell -NoProfile -File scripts\agent-loop-wpf.ps1
 - Agent 正则：`^AGENT_LOOP_WAKE_netstrata_wpf`
 - 按 [docs/WPF-ROADMAP.md](../docs/WPF-ROADMAP.md) 推进 W6b→W6h
 
+## publish.ps1
+
+**用途**：发布 `netstrata.exe` + `netstrata-tray.exe` 到 `artifacts/publish`（win-x64 单文件）。
+
+```powershell
+.\scripts\publish.ps1
+```
+
+
 
 ## health-check.ps1
 

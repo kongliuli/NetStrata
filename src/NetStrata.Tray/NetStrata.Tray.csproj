@@ -9,7 +9,10 @@
     <Nullable>enable</Nullable>
     <RootNamespace>NetStrata.Tray</RootNamespace>
     <AssemblyName>netstrata-tray</AssemblyName>
-    <ApplicationIcon />
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
 
   <ItemGroup>
