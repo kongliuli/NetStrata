@@ -4,6 +4,7 @@ using System.Windows.Forms;
 using NetStrata.Core.Cli;
 using NetStrata.Core.Config;
 using NetStrata.Core.Storage;
+using NetStrata.Core.Models;
 using NetStrata.Core.Tui;
 
 namespace NetStrata.Tray.Services;
@@ -14,22 +15,29 @@ internal sealed class TrayHost : IDisposable
     private readonly System.Windows.Threading.DispatcherTimer _timer;
     private readonly JsonSampleStorage _storage = new();
     private readonly IOnceProbeRunner _probeRunner;
+    private readonly IDaemonLifecycle _daemon;
     private readonly ContextMenuStrip _menu;
     private readonly ToolStripMenuItem _statusItem;
+    private readonly ToolStripMenuItem _daemonItem;
     private readonly ToolStripMenuItem _probeItem;
     private Views.DashboardWindow? _dashboard;
     private Views.SettingsWindow? _settings;
     private bool _probing;
 
-    public TrayHost(IOnceProbeRunner? probeRunner = null)
+    public TrayHost(IOnceProbeRunner? probeRunner = null, IDaemonLifecycle? daemon = null)
     {
         _probeRunner = probeRunner ?? new OnceProbeRunner();
+        _daemon = daemon ?? new DaemonLifecycleManager();
         _menu = new ContextMenuStrip();
 
         _statusItem = new ToolStripMenuItem("等待数据…") { Enabled = false };
         _menu.Items.Add(_statusItem);
         _menu.Items.Add(new ToolStripSeparator());
 
+        _menu.Items.Add(new ToolStripSeparator());
+
+        _daemonItem = new ToolStripMenuItem("启动 Daemon", null, (_, _) => _ = ToggleDaemonAsync());
+        _menu.Items.Add(_daemonItem);
         _probeItem = new ToolStripMenuItem("立即探测 (--once)", null, (_, _) => _ = RunOnceAsync());
         _menu.Items.Add(_probeItem);
         _menu.Items.Add("打开 Dashboard", null, (_, _) => OpenWpfDashboard());
@@ -63,20 +71,75 @@ internal sealed class TrayHost : IDisposable
                 tray = tray with { Tooltip = headline };
 
             _statusItem.Text = state is null
-                ? "等待 Daemon 数据…"
+                ? BuildDaemonStatusLine(null)
                 : $"周期 #{state.Cycle} · {state.Latest?.Verdict?.Overall ?? "unknown"}";
             _lastHeadline = state?.Latest?.Verdict?.Headline;
 
+            UpdateDaemonMenu();
             TrayIconFactory.Apply(_icon, tray);
         }
         catch
         {
             _statusItem.Text = "读取 state.json 失败";
+            UpdateDaemonMenu();
             TrayIconFactory.Apply(_icon, TrayStatusMapper.Map(null));
         }
     }
 
     private string? _lastHeadline;
+
+    private void UpdateDaemonMenu()
+    {
+        var port = NetStrataOptions.FromEnvironment().Port;
+        var ds = _daemon.GetStatus(port);
+        if (ds.OwnedRunning)
+        {
+            _daemonItem.Text = "停止 Daemon";
+            _daemonItem.Enabled = true;
+        }
+        else if (ds.Mode == "external")
+        {
+            _daemonItem.Text = $"Daemon 外部占用 :{port}";
+            _daemonItem.Enabled = false;
+        }
+        else
+        {
+            _daemonItem.Text = "启动 Daemon (--web)";
+            _daemonItem.Enabled = true;
+        }
+    }
+
+    private string BuildDaemonStatusLine(DaemonState? state)
+    {
+        var port = NetStrataOptions.FromEnvironment().Port;
+        var ds = _daemon.GetStatus(port);
+        if (state is not null)
+            return $"周期 #{state.Cycle} · {state.Latest?.Verdict?.Overall ?? "unknown"}";
+        return ds.Label;
+    }
+
+    private async Task ToggleDaemonAsync()
+    {
+        var port = NetStrataOptions.FromEnvironment().Port;
+        var ds = _daemon.GetStatus(port);
+        if (ds.OwnedRunning)
+        {
+            _daemon.StopOwned();
+            _icon.ShowBalloonTip(3000, "NetStrata", "Daemon 已停止", ToolTipIcon.Info);
+            UpdateDaemonMenu();
+            return;
+        }
+
+        _daemonItem.Enabled = false;
+        _daemonItem.Text = "启动中…";
+        var (ok, err) = await _daemon.StartAsync(port);
+        if (ok)
+            _icon.ShowBalloonTip(3000, "NetStrata", $"Daemon 已启动 :{port}", ToolTipIcon.Info);
+        else
+            _icon.ShowBalloonTip(5000, "NetStrata", err ?? "启动失败", ToolTipIcon.Error);
+
+        UpdateDaemonMenu();
+    }
 
     private async Task RunOnceAsync()
     {
@@ -162,5 +225,6 @@ internal sealed class TrayHost : IDisposable
         _menu.Dispose();
         _dashboard?.Close();
         _settings?.Close();
+        _daemon.StopOwned();
     }
 }
