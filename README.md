@@ -31,12 +31,20 @@ NetStrata 是受 [canireach](https://github.com/canireach/canireach) 启发的 .
 | [docs/WINDOWS.md](docs/WINDOWS.md) | Windows 平台探测实现对照表 |
 | [docs/API.md](docs/API.md) | Web 仪表盘 HTTP API |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 分期开发计划与验收标准 |
+| [docs/LAYER3.md](docs/LAYER3.md) | 第三层增强：TLS 栈、告警、导出、自定义 Ping |
+| [docs/TESTING.md](docs/TESTING.md) | 测试先行规格与用例表 |
 
 ## 计划中的 CLI 用法
 
 ```powershell
 # 单次探测，输出 JSON
 netstrata --once
+
+# 单次探测并 ping 自定义目标（内网 NAS 等）
+netstrata --once --ping 192.168.1.50,10.0.0.1
+
+# 导出最近 1 小时报告（Layer 3）
+netstrata --export --minutes 60 -o report.md
 
 # Web 仪表盘（默认 http://localhost:8787）
 $env:NETSTRATA_NO_OPEN='1'
@@ -57,12 +65,15 @@ netstrata
 | `NETSTRATA_LANG` | auto | `zh` / `en` |
 | `NETSTRATA_DOWNLOAD_EVERY` | `10` | 每 N 轮测代理下载速度 |
 | `NETSTRATA_NO_OPEN` | `0` | `1` = 不自动打开浏览器 |
+| `NETSTRATA_PING_EXTRA` | — | 逗号分隔额外 ping 目标，最多 10 个 |
+| `NETSTRATA_CONCLUSION_EVERY` | `30` | 每 N 轮生成 conclusions.md（Layer 3） |
 
 ## 仓库状态
 
 **当前阶段：文档驱动开发（Documentation Phase）**
 
 - [x] 产品命名与规格文档
+- [x] Layer 3 / 测试先行 / 自定义 Ping 规格
 - [ ] .NET 解决方案脚手架
 - [ ] Phase 1 MVP（Ping + DNS + HTTPS + Verdict）
 - [ ] Phase 2 Windows 平台适配

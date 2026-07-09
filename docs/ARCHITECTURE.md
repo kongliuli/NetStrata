@@ -70,6 +70,24 @@ public interface IProbe<T>
 | `CaptiveProbe` | `CaptiveResult` | 3 |
 | `ProxyDownloadProbe` | `ProxyDownload?` | 3 |
 | `TailscaleProbe` | `TailscaleInfo` | 4 |
+| `TlsStackProbe` | `IReadOnlyList<TlsStackResult>` | 5a |
+| `RouteWatch` | `IReadOnlyList<Alert>` | 5b |
+
+### RouteWatch / ConclusionEngine（Layer 3）
+
+```csharp
+public sealed class RouteWatch
+{
+    public IReadOnlyList<Alert> Compare(Sample? previous, Sample current);
+}
+
+public sealed class ConclusionEngine
+{
+    public string GenerateMarkdown(IReadOnlyList<Sample> samples);
+}
+```
+
+纯函数，无 I/O。见 [LAYER3.md](LAYER3.md)。
 
 ### SampleCollector
 
@@ -247,14 +265,17 @@ public sealed class NetStrataOptions
     public int IntervalMs { get; init; } = 60_000;
     public int Port { get; init; } = 8787;
     public string? ProxyOverride { get; init; }
+    public IReadOnlyList<string> PingExtra { get; init; } = [];
     public string Lang { get; init; } = "auto";
     public int DownloadEvery { get; init; } = 10;
+    public int ConclusionEvery { get; init; } = 30;
     public bool NoOpen { get; init; }
     public string DataDir { get; init; } = /* %APPDATA%/NetStrata/data */;
+    public string ConfigPath { get; init; } = /* %APPDATA%/NetStrata/config.json */;
 }
 ```
 
-从环境变量 `NETSTRATA_*` 加载。
+从环境变量 `NETSTRATA_*` 与 `config.json` 加载。`PingExtra` 合并顺序：config → env → CLI `--ping`（当次）。
 
 ---
 
@@ -268,7 +289,11 @@ public sealed class NetStrataOptions
 | `ProxyDetector` | mock 注册表 reader |
 | `HttpsProbe` | mock `HttpMessageHandler`，断言 URL/Proxy |
 | `PingProbe` | mock `IPingService` |
+| `RouteWatch` / `ConclusionEngine` | 纯函数，Sample 列表 → alerts / Markdown |
+| `TlsStackProbe` | mock TCP/TLS，或 Integration |
 | 集成测试 | `[Trait("Category", "Integration")]`，默认跳过 |
+
+完整用例表见 [TESTING.md](TESTING.md)。
 
 **禁止**在单元测试中 `Process.Start` 真实浏览器或系统 exe。
 

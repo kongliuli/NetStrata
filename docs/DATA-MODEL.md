@@ -20,6 +20,8 @@
   "proxyEgress": { /* ProxyEgress | null */ },
   "captive": { /* CaptiveResult */ },
   "proxyDownload": { /* ProxyDownload | null */ },
+  "tlsStack": [ /* TlsStackResult[] | null, Layer 3 */ ],
+  "alerts": [ /* Alert[] | null, Layer 3 */ ],
   "verdict": { /* Verdict */ }
 }
 ```
@@ -75,6 +77,8 @@
 ```json
 {
   "target": "223.5.5.5",
+  "label": null,
+  "custom": false,
   "ok": true,
   "lossPct": 0,
   "sent": 3,
@@ -83,6 +87,25 @@
   "avgMs": 5.1,
   "maxMs": 6.0,
   "stddevMs": 0.8,
+  "err": null
+}
+```
+
+自定义目标示例：
+
+```json
+{
+  "target": "192.168.1.50",
+  "label": "nas",
+  "custom": true,
+  "ok": true,
+  "lossPct": 0,
+  "sent": 3,
+  "received": 3,
+  "minMs": 1.0,
+  "avgMs": 1.2,
+  "maxMs": 1.5,
+  "stddevMs": 0.2,
   "err": null
 }
 ```
@@ -201,12 +224,67 @@
 
 ---
 
+## TlsStackResult（Layer 3）
+
+```json
+{
+  "label": "stack_github",
+  "host": "github.com",
+  "port": 443,
+  "dns": { "ok": true, "ms": 15.0, "ips": ["140.82.121.4"], "err": null },
+  "tcp": { "ok": true, "ms": 45.0, "err": null },
+  "tls": { "ok": true, "ms": 120.0, "err": null },
+  "http": { "ok": true, "ms": 200.0, "httpCode": 200, "err": null },
+  "verdict": "ok",
+  "stoppedAt": null
+}
+```
+
+`verdict` 枚举：`ok` | `dns_fail` | `tcp_fail` | `tls_block` | `http_block` | `unknown`
+
+`stoppedAt`：首层失败时记录 `dns` | `tcp` | `tls` | `http`。
+
+---
+
+## Alert（Layer 3）
+
+```json
+{
+  "t": "2026-07-09T04:00:00Z",
+  "type": "egress_changed",
+  "message": "proxy egress 1.2.3.4 → 5.6.7.8",
+  "prev": "1.2.3.4",
+  "curr": "5.6.7.8"
+}
+```
+
+`type` 枚举：`gateway_changed` | `ipv4_changed` | `egress_changed` | `interface_changed` | `proxy_down` | `egress_flapping` | `tls_block`
+
+---
+
+## UserConfig（`config.json`）
+
+```json
+{
+  "pingExtra": ["192.168.1.50", "10.0.0.1"],
+  "pingExtraLabels": {
+    "192.168.1.50": "nas"
+  },
+  "tlsStackTargets": ["github.com", "api.anthropic.com"]
+}
+```
+
+路径：`%APPDATA%\NetStrata\config.json`。不存在时使用内置默认。
+
+---
+
 ## Verdict（判决）
 
 ```json
 {
   "overall": "healthy",
   "headline": "all green",
+  "insights": [],
   "layers": [
     {
       "layer": "wifi",
@@ -290,6 +368,7 @@
   "startedAt": "2026-07-09T02:58:31.760Z",
   "cycle": 42,
   "latest": { /* Sample */ },
+  "recentAlerts": [ /* Alert[], 最近 20 条 */ ],
   "rolling": {
     "last20Overall": { "healthy": 18, "degraded": 2 },
     "httpsAgg": {
@@ -367,6 +446,9 @@ NetStrata.Core.Models/
 ├── WifiInfo.cs
 ├── InterfaceInfo.cs
 ├── PingResult.cs
+├── TlsStackResult.cs
+├── Alert.cs
+├── UserConfig.cs
 ├── DnsResult.cs
 ├── HttpsResult.cs
 ├── ProxyConfig.cs

@@ -17,7 +17,8 @@ NetStrata Web 模式在 `http://localhost:{PORT}` 提供本地 HTTP 服务。默
 | GET | `/api/state` | 最新 Daemon 状态 |
 | GET | `/api/samples?limit=240` | 历史样本 |
 | GET | `/api/series?limit=240` | 图表时序数据 |
-| GET | `/api/conclusions` | Markdown 结论（可选，后期） |
+| GET | `/api/conclusions` | Markdown 结论（Layer 3） |
+| GET | `/api/export?minutes=60&format=json` | 导出报告（Layer 3） |
 
 ---
 
@@ -79,13 +80,28 @@ NetStrata Web 模式在 `http://localhost:{PORT}` 提供本地 HTTP 服务。默
 
 **200**：`text/markdown`
 
-周期性生成的诊断结论文本。Phase 4 可选实现（基于最近 20 分钟样本的规则引擎或 LLM）。
+基于最近 N 条样本的规则引擎结论（`ConclusionEngine`）。Daemon 每 `NETSTRATA_CONCLUSION_EVERY` 轮（默认 30）更新 `data/conclusions.md`。规则见 [LAYER3.md](LAYER3.md#5-结论规则引擎phase-5c)。
 
 未实现时返回：
 
 ```markdown
 _(no conclusions yet)_
 ```
+
+---
+
+## GET /api/export
+
+查询参数：
+
+| 参数 | 默认 | 说明 |
+|------|------|------|
+| `minutes` | 60 | 时间范围（分钟） |
+| `format` | `json` | `json` 或 `markdown` |
+
+**200**：诊断报告（overall 分布、各层统计、custom ping、recent alerts、conclusions 节选）。
+
+CLI 等价：`netstrata --export --minutes 60 --format markdown -o report.md`
 
 ---
 

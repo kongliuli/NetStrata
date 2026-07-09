@@ -79,7 +79,7 @@
 
 ### 2.4 公网 Ping (`pings`)
 
-固定目标（始终探测）：
+#### 内置目标（始终探测）
 
 ```
 223.5.5.5    # 阿里 DNS
@@ -89,6 +89,22 @@
 ```
 
 用于 **broadband** 层判决（以 `223.5.5.5` 为主）。
+
+#### 自定义目标（Phase 2.5）
+
+用户可追加 ping 目标，用于监控内网设备、VPN 节点等。**不参与 6 层 verdict**，仅观测展示。
+
+| 来源 | 示例 |
+|------|------|
+| CLI | `netstrata --once --ping 192.168.1.50,10.0.0.1` |
+| 环境变量 | `NETSTRATA_PING_EXTRA=192.168.1.50,10.0.0.1` |
+| 配置文件 | `%APPDATA%\NetStrata\config.json` → `pingExtra` |
+
+规则：
+- 与内置目标并行探测（3 包，1500ms/包）
+- 结果字段 `custom: true`，可选 `label`（见 [LAYER3.md](LAYER3.md#1-自定义-ping-目标phase-25)）
+- 最多 **10** 个 extra；非法地址跳过并记日志
+- 优先级：CLI（仅当次）> 环境变量 + 配置文件（合并去重）
 
 ---
 
@@ -231,6 +247,24 @@ Domains: baidu.com, google.com, github.com, cloudflare.com
 | `signedIn` | 是否已登录 |
 | `exitNodeActive` | 是否使用 exit node |
 | `address` | Tailscale IP |
+
+---
+
+### 2.12 TLS/SNI 栈探测（Layer 3，Phase 5a）
+
+对选定 host:443 执行 **DNS → TCP → TLS → HTTP** 四层探测，定位封锁类型（DNS 污染、TCP RST、TLS DPI 等）。
+
+默认目标：`www.google.com`、`github.com`、`api.anthropic.com`。可经 `config.json` → `tlsStackTargets` 覆盖。
+
+每条 `TlsStackResult` 记录各层 `ok` / `ms` / `err` / `verdict`（如 `dns_fail`、`tls_block`）。详见 [LAYER3.md](LAYER3.md#2-tlssni-分层探测phase-5a) 与 [DATA-MODEL.md](DATA-MODEL.md#tlsstackresult)。
+
+**不修改** `overall` 六层优先级；结论写入 `alerts` / `verdict.insights`。
+
+---
+
+### 2.13 变化告警（Layer 3，Phase 5b）
+
+Daemon 对比相邻两轮 Sample，检测网关、本机 IP、代理出口、默认网卡变化，写入 `alerts[]`。详见 [LAYER3.md](LAYER3.md#3-路由与出口变化告警phase-5b)。
 
 ---
 
