@@ -21,7 +21,8 @@ internal sealed class TrayHost : IDisposable
     private readonly ToolStripMenuItem _daemonItem;
     private readonly ToolStripMenuItem _probeItem;
     private Views.DashboardWindow? _dashboard;
-    private Views.SettingsWindow? _settings;
+    private readonly Views.SettingsWindow? _settings;
+    private readonly AlertWatchState _alerts = new();
     private bool _probing;
 
     public TrayHost(IOnceProbeRunner? probeRunner = null, IDaemonLifecycle? daemon = null)
@@ -32,8 +33,6 @@ internal sealed class TrayHost : IDisposable
 
         _statusItem = new ToolStripMenuItem("等待数据…") { Enabled = false };
         _menu.Items.Add(_statusItem);
-        _menu.Items.Add(new ToolStripSeparator());
-
         _menu.Items.Add(new ToolStripSeparator());
 
         _daemonItem = new ToolStripMenuItem("启动 Daemon", null, (_, _) => _ = ToggleDaemonAsync());
@@ -74,6 +73,15 @@ internal sealed class TrayHost : IDisposable
                 ? BuildDaemonStatusLine(null)
                 : $"周期 #{state.Cycle} · {state.Latest?.Verdict?.Overall ?? "unknown"}";
             _lastHeadline = state?.Latest?.Verdict?.Headline;
+
+            foreach (var alert in _alerts.ConsumeNew(state))
+            {
+                _icon.ShowBalloonTip(
+                    8000,
+                    $"NetStrata 告警 · {alert.Type}",
+                    alert.Message,
+                    ToolTipIcon.Warning);
+            }
 
             UpdateDaemonMenu();
             TrayIconFactory.Apply(_icon, tray);

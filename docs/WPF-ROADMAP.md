@@ -31,7 +31,7 @@ src/
 | 3 | **W6c** | ✅ 完成 | 原生 WPF Dashboard 窗口 | 六层 + 代理 + 告警 |
 | 4 | **W6d** | ✅ 完成 | 设置窗口 | 编辑 config.json（interval/port/ping/TLS） |
 | 5 | **W6e** | ✅ 完成 | Daemon 启停 | 托盘内 --web 生命周期 + 端口检测 |
-| 6 | **W6f** | 待做 | Toast 告警 | recentAlerts 变化通知 |
+| 6 | **W6f** | ✅ 完成 | Toast 告警 | recentAlerts 新增时气泡通知 |
 | 7 | **W6g** | 待做 | 开机自启 | Startup 快捷方式（可选） |
 | 8 | **W6h** | 待做 | 发布 | netstrata-tray win-x64 单文件 |
 
