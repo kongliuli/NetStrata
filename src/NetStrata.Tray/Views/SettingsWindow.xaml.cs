@@ -1,12 +1,16 @@
+using System.IO;
 using System.Windows;
 using NetStrata.Core.Config;
 using NetStrata.Core.Storage;
+using NetStrata.Core.Tray;
+using NetStrata.Tray.Services;
 
 namespace NetStrata.Tray.Views;
 
 public partial class SettingsWindow : Window
 {
     private readonly string _configPath = DataDirectory.ConfigPath;
+    private readonly StartupShortcutService _startup = new(new WindowsStartupLinkWriter());
 
     public SettingsWindow()
     {
@@ -22,6 +26,7 @@ public partial class SettingsWindow : Window
         PingExtraBox.Text = form.PingExtra;
         PingLabelsBox.Text = form.PingLabels;
         TlsTargetsBox.Text = form.TlsStackTargets;
+        StartupCheck.IsChecked = _startup.IsEnabled();
         StatusText.Text = _configPath;
     }
 
@@ -40,7 +45,12 @@ public partial class SettingsWindow : Window
 
             DataDirectory.EnsureExists();
             UserConfigLoader.Save(_configPath, config);
-            StatusText.Text = "已保存 — 重启 Daemon 后生效";
+
+            var trayExe = Environment.ProcessPath
+                ?? Path.Combine(AppContext.BaseDirectory, "netstrata-tray.exe");
+            _startup.SetEnabled(StartupCheck.IsChecked == true, trayExe);
+
+            StatusText.Text = "已保存 — 配置需重启 Daemon；开机自启已更新";
         }
         catch (Exception ex)
         {
