@@ -137,7 +137,9 @@ public sealed class DaemonLifecycleManager : IDaemonLifecycle
             return info;
         }
 
-        if (exe.Equals("netstrata", StringComparison.OrdinalIgnoreCase) || File.Exists(exe))
+        if (exe.Equals("netstrata", StringComparison.OrdinalIgnoreCase)
+            || exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+            || File.Exists(exe))
         {
             var info = Base(exe, "--web");
             info.Environment["NETSTRATA_NO_OPEN"] = "1";
