@@ -29,7 +29,7 @@ src/
 | 1 | **W6a** | ✅ 完成 | 托盘 + 轮询 state.json + 基础菜单 | 颜色随 overall 变 |
 | 2 | **W6b** | ✅ 完成 | CliPathResolver、OnceProbeRunner、气泡提示 | 菜单显示周期、探测结果 balloon |
 | 3 | **W6c** | ✅ 完成 | 原生 WPF Dashboard 窗口 | 六层 + 代理 + 告警 |
-| 4 | **W6d** | 待做 | 设置窗口 | 编辑 config.json |
+| 4 | **W6d** | ✅ 完成 | 设置窗口 | 编辑 config.json（interval/port/ping/TLS） |
 | 5 | **W6e** | 待做 | Daemon 启停 | 托盘内 --web 生命周期 |
 | 6 | **W6f** | 待做 | Toast 告警 | recentAlerts 变化通知 |
 | 7 | **W6g** | 待做 | 开机自启 | Startup 快捷方式（可选） |

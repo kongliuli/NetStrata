@@ -1,4 +1,6 @@
 {
+  "intervalMs": 60000,
+  "port": 8787,
   "pingExtra": ["192.168.1.50", "10.0.0.1"],
   "pingExtraLabels": {
     "192.168.1.50": "nas",

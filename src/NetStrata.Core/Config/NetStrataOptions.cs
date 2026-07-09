@@ -24,8 +24,8 @@ public sealed class NetStrataOptions
         var pingExtra = MergePingExtra(config.PingExtra, Environment.GetEnvironmentVariable("NETSTRATA_PING_EXTRA"));
         return new NetStrataOptions
         {
-            IntervalMs = ParseInt(Environment.GetEnvironmentVariable("NETSTRATA_INTERVAL_MS"), 60_000),
-            Port = ParseInt(Environment.GetEnvironmentVariable("NETSTRATA_PORT"), 8787),
+            IntervalMs = ParseInt(Environment.GetEnvironmentVariable("NETSTRATA_INTERVAL_MS"), config.IntervalMs ?? 60_000),
+            Port = ParseInt(Environment.GetEnvironmentVariable("NETSTRATA_PORT"), config.Port ?? 8787),
             ProxyOverride = NormalizeProxyOverride(Environment.GetEnvironmentVariable("NETSTRATA_PROXY")),
             PingExtra = pingExtra,
             PingExtraLabels = config.PingExtraLabels,

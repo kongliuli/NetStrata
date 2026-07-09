@@ -18,6 +18,7 @@ internal sealed class TrayHost : IDisposable
     private readonly ToolStripMenuItem _statusItem;
     private readonly ToolStripMenuItem _probeItem;
     private Views.DashboardWindow? _dashboard;
+    private Views.SettingsWindow? _settings;
     private bool _probing;
 
     public TrayHost(IOnceProbeRunner? probeRunner = null)
@@ -33,6 +34,7 @@ internal sealed class TrayHost : IDisposable
         _menu.Items.Add(_probeItem);
         _menu.Items.Add("打开 Dashboard", null, (_, _) => OpenWpfDashboard());
         _menu.Items.Add("打开 Web 仪表盘", null, (_, _) => OpenWebDashboard());
+        _menu.Items.Add("设置…", null, (_, _) => OpenSettings());
         _menu.Items.Add("复制 headline", null, (_, _) => CopyHeadline());
         _menu.Items.Add(new ToolStripSeparator());
         _menu.Items.Add("退出", null, (_, _) => Shutdown());
@@ -108,6 +110,19 @@ internal sealed class TrayHost : IDisposable
         }
     }
 
+    private void OpenSettings()
+    {
+        if (_settings is { IsLoaded: true })
+        {
+            _settings.Activate();
+            return;
+        }
+
+        _settings = new Views.SettingsWindow();
+        _settings.Closed += (_, _) => _settings = null;
+        _settings.Show();
+    }
+
     private void OpenWpfDashboard()
     {
         if (_dashboard is { IsLoaded: true })
@@ -146,5 +161,6 @@ internal sealed class TrayHost : IDisposable
         _icon.Dispose();
         _menu.Dispose();
         _dashboard?.Close();
+        _settings?.Close();
     }
 }
