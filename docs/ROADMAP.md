@@ -167,7 +167,7 @@ netstrata --web
 
 ---
 
-## Phase 5：Layer 3 增强（第三层）
+## Phase 5：Layer 3 增强（第三层，已完成）
 
 **目标**：Windows 分层网络诊断参考实现。规格见 [LAYER3.md](LAYER3.md)，测试见 [TESTING.md](TESTING.md#layer-3增强层)。
 
@@ -193,10 +193,10 @@ netstrata --web
 - [x] `netstrata --export` + `GET /api/export`
 - [x] 结论规则含自定义 ping 失败（R05）
 
-### Phase 5d：系统托盘（可选）
+### Phase 5d：系统托盘（可选，逻辑已完成）
 
-- [ ] `NetStrata.Tray` — 图标状态映射
-- [ ] `TrayStatusMapper` 单测，不启动真实托盘
+- [ ] `NetStrata.Tray` — WPF/WinForms 薄壳（推迟，需时另开）
+- [x] `TrayStatusMapper` 单测，不启动真实托盘
 
 ### 验收标准
 
