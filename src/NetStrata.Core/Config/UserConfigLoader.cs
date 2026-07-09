@@ -11,6 +11,9 @@ public sealed class UserConfig
     [JsonPropertyName("pingExtraLabels")]
     public IReadOnlyDictionary<string, string> PingExtraLabels { get; init; } =
         new Dictionary<string, string>();
+
+    [JsonPropertyName("tlsStackTargets")]
+    public IReadOnlyList<string> TlsStackTargets { get; init; } = [];
 }
 
 public static class UserConfigLoader

@@ -8,6 +8,7 @@ public sealed class NetStrataOptions
     public int Port { get; init; } = 8787;
     public string? ProxyOverride { get; init; }
     public IReadOnlyList<string> PingExtra { get; init; } = [];
+    public IReadOnlyList<string> TlsStackTargets { get; init; } = [];
     public string Lang { get; init; } = "auto";
     public int DownloadEvery { get; init; } = 10;
     public int ConclusionEvery { get; init; } = 30;
@@ -25,6 +26,7 @@ public sealed class NetStrataOptions
             Port = ParseInt(Environment.GetEnvironmentVariable("NETSTRATA_PORT"), 8787),
             ProxyOverride = NormalizeProxyOverride(Environment.GetEnvironmentVariable("NETSTRATA_PROXY")),
             PingExtra = pingExtra,
+            TlsStackTargets = config.TlsStackTargets,
             Lang = Environment.GetEnvironmentVariable("NETSTRATA_LANG") ?? "auto",
             DownloadEvery = ParseInt(Environment.GetEnvironmentVariable("NETSTRATA_DOWNLOAD_EVERY"), 10),
             ConclusionEvery = ParseInt(Environment.GetEnvironmentVariable("NETSTRATA_CONCLUSION_EVERY"), 30),

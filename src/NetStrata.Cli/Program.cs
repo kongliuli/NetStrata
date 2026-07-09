@@ -20,7 +20,8 @@ if (args.Contains("--once"))
     var sample = await collector.CollectAsync(new CollectOptions
     {
         PingExtra = pingExtra,
-        ProxyOverride = options.ProxyOverride
+        ProxyOverride = options.ProxyOverride,
+        TlsStackTargets = options.TlsStackTargets
     }, cts.Token);
 
     Console.WriteLine(JsonSerializer.Serialize(sample, JsonOptions.Default));

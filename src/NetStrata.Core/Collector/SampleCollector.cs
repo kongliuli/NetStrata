@@ -11,6 +11,7 @@ namespace NetStrata.Core.Collector;
 public sealed class CollectOptions
 {
     public IReadOnlyList<string> PingExtra { get; init; } = [];
+    public IReadOnlyList<string> TlsStackTargets { get; init; } = [];
     public string? ProxyOverride { get; init; }
     public bool WithDownload { get; init; }
 }
@@ -28,6 +29,7 @@ public sealed class SampleCollector
     private readonly CaptiveProbe _captiveProbe = new();
     private readonly ProxyDownloadProbe _proxyDownloadProbe = new();
     private readonly TailscaleProbe _tailscaleProbe = new();
+    private readonly TlsStackProbe _tlsStackProbe = new();
     private readonly ISystemProxyReader _registryReader;
     private readonly VerdictEngine _verdictEngine = new();
 
@@ -93,6 +95,9 @@ public sealed class SampleCollector
 
         sw.Stop();
 
+        var tlsTargets = TlsStackTargets.Resolve(options.TlsStackTargets);
+        var tlsStack = await _tlsStackProbe.ProbeAllAsync(tlsTargets, ct);
+
         var partial = new Sample
         {
             T = DateTime.UtcNow.ToString("o"),
@@ -106,9 +111,19 @@ public sealed class SampleCollector
             ProxyEgress = proxyEgress,
             Captive = await captiveTask,
             ProxyDownload = proxyDownload,
-            Tailscale = await tailscaleTask
+            Tailscale = await tailscaleTask,
+            TlsStack = tlsStack
         };
 
-        return partial with { Verdict = _verdictEngine.Judge(partial) };
+        var verdict = _verdictEngine.Judge(partial);
+        var insights = tlsStack
+            .Select(TlsStackEvaluator.ToInsight)
+            .Where(i => i is not null)
+            .Cast<string>()
+            .ToList();
+        if (insights.Count > 0)
+            verdict = verdict with { Insights = verdict.Insights.Concat(insights).ToList() };
+
+        return partial with { Verdict = verdict };
     }
 }

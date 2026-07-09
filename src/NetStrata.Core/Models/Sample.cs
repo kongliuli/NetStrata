@@ -40,6 +40,9 @@ public sealed record Sample
     [JsonPropertyName("tailscale")]
     public TailscaleInfo? Tailscale { get; init; }
 
+    [JsonPropertyName("tlsStack")]
+    public IReadOnlyList<TlsStackResult>? TlsStack { get; init; }
+
     [JsonPropertyName("verdict")]
     public Verdict? Verdict { get; init; }
 }

@@ -43,7 +43,8 @@ public sealed class ProbeDaemon : BackgroundService
                 {
                     PingExtra = _options.PingExtra,
                     ProxyOverride = _options.ProxyOverride,
-                    WithDownload = withDownload
+                    WithDownload = withDownload,
+                    TlsStackTargets = _options.TlsStackTargets
                 }, ct);
 
                 await _storage.AppendAsync(sample, ct);

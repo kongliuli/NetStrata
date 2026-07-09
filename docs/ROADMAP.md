@@ -171,12 +171,12 @@ netstrata --web
 
 **目标**：Windows 分层网络诊断参考实现。规格见 [LAYER3.md](LAYER3.md)，测试见 [TESTING.md](TESTING.md#layer-3增强层)。
 
-### Phase 5a：TLS/SNI 栈探测
+### Phase 5a：TLS/SNI 栈探测（已完成）
 
-- [ ] `TlsStackProbe` — DNS→TCP→TLS→HTTP
-- [ ] `config.json` → `tlsStackTargets`
-- [ ] `verdict.insights` 信息性条目
-- [ ] 单元测试：TlsProbeTests
+- [x] `TlsStackProbe` — DNS→TCP→TLS→HTTP
+- [x] `config.json` → `tlsStackTargets`
+- [x] `verdict.insights` 信息性条目
+- [x] 单元测试：TlsProbeTests
 
 ### Phase 5b：告警与路由提示
 
