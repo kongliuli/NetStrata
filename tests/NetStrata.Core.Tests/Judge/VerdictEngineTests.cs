@@ -69,6 +69,26 @@ public sealed class VerdictEngineTests
     }
 
     [Fact]
+    public void Judge_DnsFail_PingOk_HttpsOk_DegradedWithInsight()
+    {
+        var baseSample = SampleBuilder.Healthy();
+        var sample = baseSample with
+        {
+            Dns =
+            [
+                new DnsResult { Server = "223.5.5.5", Domain = "baidu.com", Ok = false, Ms = 1, Err = "timeout" }
+            ]
+        };
+
+        var verdict = _engine.Judge(sample);
+        Assert.Equal("degraded", verdict.Overall);
+        var broadband = verdict.Layers.Single(l => l.Layer == "broadband");
+        Assert.Equal("degraded", broadband.State);
+        Assert.Contains(broadband.Reasons, r => r.StartsWith("dns_udp_blocked"));
+        Assert.Contains(verdict.Insights, i => i.Contains("dns_path_blocked"));
+    }
+
+    [Fact]
     public void Judge_OverseasFail_ProxyOk_DirectBlocked()
     {
         var sample = SampleBuilder.WithProxy();

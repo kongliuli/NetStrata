@@ -6,9 +6,10 @@ namespace NetStrata.Core.Tests.Tui;
 public sealed class TrayStatusMapperTests
 {
     [Theory]
-    [InlineData("ok", "green")]
+    [InlineData("healthy", "green")]
+    [InlineData("direct_blocked_proxy_ok", "green")]
     [InlineData("degraded", "yellow")]
-    [InlineData("fail", "red")]
+    [InlineData("broadband_bad", "red")]
     [InlineData(null, "gray")]
     public void Map_MapsOverallToColor(string? overall, string color)
     {

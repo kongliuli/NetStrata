@@ -195,8 +195,8 @@ netstrata --web
 
 ### Phase 5d：系统托盘（可选，逻辑已完成）
 
-- [ ] `NetStrata.Tray` — WPF/WinForms 薄壳（推迟，需时另开）
-- [x] `TrayStatusMapper` 单测，不启动真实托盘
+- [ ] `NetStrata.Tray` — WPF 桌面（[WPF-ROADMAP.md](WPF-ROADMAP.md)，与 Cli 共存）
+- [x] `TrayStatusMapper` / `TrayStateReader` 单测
 
 ### 验收标准
 

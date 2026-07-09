@@ -75,7 +75,7 @@ dotnet publish src/NetStrata.Cli/NetStrata.Cli.csproj -c Release -r win-x64 -o a
 | [docs/LAYER3.md](docs/LAYER3.md) | TLS 栈、告警、导出 |
 | [docs/TESTING.md](docs/TESTING.md) | 测试规格 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 分期计划 |
-| [docs/TECH-DEBT.md](docs/TECH-DEBT.md) | 技术债务状态与验证 |
+| [docs/WPF-ROADMAP.md](docs/WPF-ROADMAP.md) | WPF 托盘分步路线图（W6a–W6h） |
 | [scripts/README.md](scripts/README.md) | agent-loop、health-check |
 
 ## 调度与 Agent

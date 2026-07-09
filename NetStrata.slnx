@@ -3,6 +3,7 @@
     <Project Path="src/NetStrata.Cli/NetStrata.Cli.csproj" />
     <Project Path="src/NetStrata.Core/NetStrata.Core.csproj" />
     <Project Path="src/NetStrata.Daemon/NetStrata.Daemon.csproj" />
+    <Project Path="src/NetStrata.Tray/NetStrata.Tray.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/NetStrata.Core.Tests/NetStrata.Core.Tests.csproj" />

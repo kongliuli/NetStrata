@@ -152,8 +152,17 @@ public sealed class VerdictEngine
 
             if (baiduDns is not null && !baiduDns.Ok)
             {
-                bbState = Worse(bbState, LayerState.Fail);
-                bbReasons.Add("dig baidu via 223.5.5.5 fail");
+                // ponytail: ping/https ok but dig fail → DNS path blocked, not broadband outage
+                if (aliPing is { Ok: true } && baiduHttps is { Ok: true })
+                {
+                    bbState = Worse(bbState, LayerState.Degraded);
+                    bbReasons.Add("dns_udp_blocked: dig 223.5.5.5 fail but ping/https ok");
+                }
+                else
+                {
+                    bbState = Worse(bbState, LayerState.Fail);
+                    bbReasons.Add("dig baidu via 223.5.5.5 fail");
+                }
             }
 
             if (baiduHttps is not null && !baiduHttps.Ok)
@@ -409,10 +418,15 @@ public sealed class VerdictEngine
             headline = "all green";
         }
 
+        var insights = new List<string>();
+        if (bbReasons.Any(r => r.StartsWith("dns_udp_blocked", StringComparison.Ordinal)))
+            insights.Add("dns_path_blocked: public DNS UDP 53 likely filtered; HTTP/proxy may still work");
+
         return new Verdict
         {
             Overall = overall,
             Headline = headline,
+            Insights = insights,
             Layers = layers,
             Ai = new AiVerdict
             {
