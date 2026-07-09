@@ -47,19 +47,19 @@ netstrata --once | ConvertFrom-Json
 
 ---
 
-## Phase 2.5：自定义 Ping（Layer 3 前置）
+## Phase 2.5：自定义 Ping（Layer 3 前置）✅
 
 **目标**：用户可监控内网/自定义 IP，结果出现在 JSON 与图表中。
 
 ### 任务
 
-- [ ] `UserConfig` 读取 `%APPDATA%\NetStrata\config.json`
-- [ ] `NETSTRATA_PING_EXTRA` 环境变量
-- [ ] CLI `--ping` 单次参数
-- [ ] `PingProbe` 合并内置 + extra（上限 10）
-- [ ] `PingResult.custom` / `label` 字段
-- [ ] `SeriesBuilder` 含 `custom_*` 时序键
-- [ ] 单元测试：见 [TESTING.md](TESTING.md#自定义-ping-专项)
+- [x] `UserConfig` 读取 `%APPDATA%\NetStrata\config.json`
+- [x] `NETSTRATA_PING_EXTRA` 环境变量
+- [x] CLI `--ping` 单次参数
+- [x] `PingProbe` 合并内置 + extra（上限 10）
+- [x] `PingResult.custom` / `label` 字段
+- [ ] `SeriesBuilder` 含 `custom_*` 时序键（Phase 3）
+- [x] 单元测试：见 [TESTING.md](TESTING.md#自定义-ping-专项)
 
 ### 验收标准
 
@@ -75,20 +75,20 @@ netstrata --once | ConvertFrom-Json | Select-Object -Expand pings | Where-Object
 
 ---
 
-## Phase 2：Windows 平台适配
+## Phase 2：Windows 平台适配 ✅
 
 **目标**：代理检测、系统代理读取、Wi-Fi 信息、端口监听。
 
 ### 任务
 
-- [x] `ProxyDetector` — 环境变量 → 注册表 → 端口扫描（WinHTTP 待补）
+- [x] `ProxyDetector` — 环境变量 → 注册表 → 端口扫描（WinHTTP 按需）
 - [x] `ProxyConfigProbe` — listening + listenerProcess
 - [x] `HttpsProbe` 代理分支 — 6 个 proxy 目标
 - [x] `ProxyEgressProbe` — ipify / ifconfig.me
-- [ ] `WifiProbe` — netsh wlan show interfaces
+- [x] `WifiProbe` — netsh wlan show interfaces
 - [x] Ping 防火墙修正 — ping fail + https ok → degraded
 - [x] `NETSTRATA_PROXY` / `NETSTRATA_PING_EXTRA` 环境变量
-- [ ] 数据目录 `%APPDATA%\NetStrata\`
+- [x] 数据目录 `%APPDATA%\NetStrata\`
 
 ### 验收标准
 

@@ -2,9 +2,11 @@
 using System.Text.Json.Serialization;
 using NetStrata.Core.Collector;
 using NetStrata.Core.Config;
+using NetStrata.Core.Storage;
 
 if (args.Contains("--once"))
 {
+    DataDirectory.EnsureExists();
     var options = NetStrataOptions.FromEnvironment();
     var pingExtra = NetStrataOptions.MergePingExtra(
         options.PingExtra,

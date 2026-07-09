@@ -1,5 +1,7 @@
 namespace NetStrata.Core.Config;
 
+using NetStrata.Core.Storage;
+
 public sealed class NetStrataOptions
 {
     public int IntervalMs { get; init; } = 60_000;
@@ -9,15 +11,11 @@ public sealed class NetStrataOptions
     public string Lang { get; init; } = "auto";
     public int DownloadEvery { get; init; } = 10;
     public bool NoOpen { get; init; }
-    public string DataDir { get; init; } =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NetStrata", "data");
-    public string ConfigPath { get; init; } =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NetStrata", "config.json");
+    public string DataDir { get; init; } = DataDirectory.DataPath;
 
     public static NetStrataOptions FromEnvironment()
     {
-        var config = UserConfigLoader.Load(
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NetStrata", "config.json"));
+        var config = UserConfigLoader.Load(DataDirectory.ConfigPath);
 
         var pingExtra = MergePingExtra(config.PingExtra, Environment.GetEnvironmentVariable("NETSTRATA_PING_EXTRA"));
         return new NetStrataOptions
@@ -29,8 +27,7 @@ public sealed class NetStrataOptions
             Lang = Environment.GetEnvironmentVariable("NETSTRATA_LANG") ?? "auto",
             DownloadEvery = ParseInt(Environment.GetEnvironmentVariable("NETSTRATA_DOWNLOAD_EVERY"), 10),
             NoOpen = Environment.GetEnvironmentVariable("NETSTRATA_NO_OPEN") == "1",
-            DataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NetStrata", "data"),
-            ConfigPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NetStrata", "config.json")
+            DataDir = DataDirectory.DataPath
         };
     }
 

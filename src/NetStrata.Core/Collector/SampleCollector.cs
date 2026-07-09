@@ -4,6 +4,7 @@ using NetStrata.Core.Judge;
 using NetStrata.Core.Models;
 using NetStrata.Core.Probes;
 using NetStrata.Core.Proxy;
+using NetStrata.Core.Storage;
 
 namespace NetStrata.Core.Collector;
 
@@ -17,6 +18,7 @@ public sealed class SampleCollector
 {
     private readonly IPingSender _pinger;
     private readonly InterfaceProbe _interfaceProbe = new();
+    private readonly WifiProbe _wifiProbe = new();
     private readonly DnsProbe _dnsProbe = new();
     private readonly HttpsProbe _httpsProbe = new();
     private readonly ProxyDetector _proxyDetector;
@@ -40,9 +42,11 @@ public sealed class SampleCollector
     public async Task<Sample> CollectAsync(CollectOptions? options = null, CancellationToken ct = default)
     {
         options ??= new CollectOptions();
+        DataDirectory.EnsureExists();
         var sw = Stopwatch.StartNew();
 
         var iface = await _interfaceProbe.ProbeAsync(ct);
+        var wifiTask = _wifiProbe.ProbeAsync(iface, ct);
         var systemProxy = _registryReader.Read();
         var proxyUrl = _proxyDetector.Detect(options.ProxyOverride);
 
@@ -69,7 +73,7 @@ public sealed class SampleCollector
 
         var dnsTask = _dnsProbe.ProbeAsync(ct);
         var httpsTask = _httpsProbe.ProbeTargetsAsync(httpsTargets, proxyUrl, ct);
-        await Task.WhenAll(dnsTask, httpsTask);
+        await Task.WhenAll(dnsTask, httpsTask, wifiTask);
 
         var proxyConfig = _proxyConfigProbe.Probe(proxyUrl, systemProxy);
         ProxyEgress? proxyEgress = null;
@@ -82,7 +86,7 @@ public sealed class SampleCollector
         {
             T = DateTime.UtcNow.ToString("o"),
             CycleMs = sw.Elapsed.TotalMilliseconds,
-            Wifi = null,
+            Wifi = await wifiTask,
             Iface = iface,
             Dns = await dnsTask,
             Pings = pingResults,
