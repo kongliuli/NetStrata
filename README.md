@@ -76,6 +76,7 @@ dotnet run --project src/NetStrata.Tray
 | [docs/TESTING.md](docs/TESTING.md) | 测试规格 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 分期计划 |
 | [docs/WPF-ROADMAP.md](docs/WPF-ROADMAP.md) | WPF 与单 exe 架构 |
+| [docs/NETWORK-FLOW-VISUALIZATION.md](docs/NETWORK-FLOW-VISUALIZATION.md) | WPF 多层网络流转、动画与数据语义 |
 | [scripts/README.md](scripts/README.md) | agent-loop、health-check |
 
 ## 调度与 Agent

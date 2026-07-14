@@ -9,6 +9,7 @@ using HandyControl.Controls;
 using HandyControl.Data;
 using NetStrata.Core.Cli;
 using NetStrata.Core.Config;
+using NetStrata.Core.Flow;
 using NetStrata.Core.Probes;
 using NetStrata.Core.Storage;
 using NetStrata.Core.Tui;
@@ -198,6 +199,7 @@ public partial class MainWindow : HcWindow
 
             var chain = ChainMapper.FromState(state, lang);
             ApplyChain(chain);
+            NetworkFlow.SetTraces(FlowTraceBuilder.FromState(state, lang));
 
             ApplyAi(overview, lang);
             ApplyLocal(local);
