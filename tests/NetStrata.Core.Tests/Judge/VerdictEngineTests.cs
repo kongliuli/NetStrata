@@ -110,17 +110,16 @@ public sealed class VerdictEngineTests
     [Fact]
     public void Judge_NoProxy_AiDirectOnly()
     {
-        var sample = SampleBuilder.Healthy() with
-        {
-            Https = SampleBuilder.Healthy().Https.Concat(
-            [
-                Https("anthropic_direct", "direct", true),
-                Https("openai_direct", "direct", true)
-            ]).ToList()
-        };
-
-        var verdict = _engine.Judge(sample);
+        var verdict = _engine.Judge(SampleBuilder.Healthy());
         Assert.Equal("direct_only", verdict.Ai.State);
+        Assert.Contains("直连可达", verdict.Ai.Headline);
+    }
+
+    [Fact]
+    public void Judge_WithProxy_AllAiProxy_ProxyOnly()
+    {
+        var verdict = _engine.Judge(SampleBuilder.WithProxy());
+        Assert.Equal("proxy_only", verdict.Ai.State);
     }
 
     [Fact]

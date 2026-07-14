@@ -9,23 +9,22 @@
 ### 开发构建
 
 ```powershell
-cd C:\Users\yf\Projects\NetStrata
+cd D:\FromGit\NetStrata
 dotnet build
 dotnet test
-dotnet run --project src/NetStrata.Cli/NetStrata.Cli.csproj -- --help
+dotnet run --project src/NetStrata.Tray -- --help
 ```
 
 ### 单文件发布（推荐分发）
 
 ```powershell
-dotnet publish src/NetStrata.Cli/NetStrata.Cli.csproj -c Release -r win-x64 `
-  -o .\artifacts\publish
+.\scripts\publish.ps1
 
-# 产出 netstrata.exe（PublishTrimmed 后约 19MB，自包含运行时）
-.\artifacts\publish\netstrata.exe --help
+# 产出 NetStrata.exe（WPF 托盘 + CLI）
+.\artifacts\publish\NetStrata.exe --help
 ```
 
-可将 `netstrata.exe` 加入 `PATH`，或在发布目录直接运行。
+可将 `NetStrata.exe` 加入 `PATH`，或在发布目录直接运行。
 
 ---
 
@@ -33,54 +32,58 @@ dotnet publish src/NetStrata.Cli/NetStrata.Cli.csproj -c Release -r win-x64 `
 
 | 模式 | 命令 | 说明 |
 |------|------|------|
-| **TUI（默认）** | `netstrata` | Spectre.Console 实时面板，6 层 + AI；快捷键 `q` 退出、`l` 语言、`r` 刷新 |
-| **TUI 只读** | `netstrata --follow` | 仅读 daemon 的 `state.json`，不主动采集 |
-| **单次探测** | `netstrata --once` | 采集一轮，JSON 输出到 stdout（适合脚本/CI） |
-| **Web + Daemon** | `netstrata --web` | 后台探测循环 + `http://localhost:8787` 仪表盘 |
-| **导出报告** | `netstrata --export -o report.md` | 基于历史样本生成 Markdown/JSON 报告 |
-| **帮助** | `netstrata --help` | 打印用法与环境变量摘要 |
+| **托盘（默认）** | `NetStrata` | WPF 主窗 + 托盘 + **进程内 Daemon**；设置 / 告警气泡 |
+| **TUI** | `NetStrata --tui` | Spectre.Console 实时面板；`q` 退出、`l` 语言、`r` 刷新 |
+| **TUI 只读** | `NetStrata --follow` | 仅读 daemon 的 `state.json`，不主动采集 |
+| **单次探测** | `NetStrata --once` | 采集一轮，JSON 输出到 stdout（适合脚本/CI） |
+| **导出报告** | `NetStrata --export -o report.md` | 基于历史样本生成 Markdown/JSON 报告 |
+| **帮助** | `NetStrata --help` | 打印用法与环境变量摘要 |
+
+> `--web` 本阶段未启用。探测由托盘进程内 Daemon 完成；Web 仪表盘后续再做。
 
 ### 2.1 单次探测 + 自定义 Ping
 
 ```powershell
-netstrata --once --ping 192.168.1.50,10.0.0.1
+NetStrata --once --ping 192.168.1.50,10.0.0.1
 ```
 
 自定义目标合并进 `sample.pings[]`（`custom: true`），**不参与** 6 层 verdict，仅供观测与导出。
 
-### 2.2 Web 仪表盘
+### 2.2 托盘 UI
 
 ```powershell
-$env:NETSTRATA_NO_OPEN = '1'          # 不自动打开浏览器
-$env:NETSTRATA_INTERVAL_MS = '20000'  # 20 秒一轮
-netstrata --web
-# 浏览器访问 http://localhost:8787
+dotnet run --project src/NetStrata.Tray
+# 或
+.\artifacts\publish\NetStrata.exe
 ```
 
-API 详情见 [API.md](API.md)。
+启动后显示主窗口并开始进程内探测。主窗 Tab：
+
+| Tab | 内容 |
+|-----|------|
+| **总览** | 分层摘要、全部 AI 卡片、自定义目标、本机网络 |
+| **探测链路** | 各层判决原因与指标（中文） |
+| **AI / API** | 6 家 API 可达性；单击/右键打开**官网**（探测走 API 端点） |
+| **自定义目标** | 页内添加 Ping 主机或 `https://` URL（写入 `pingExtra` / `httpsExtra` 并热重载） |
+| **本机网络** | IPv4 / 网关 / DNS / Wi‑Fi / 代理 / 出口 IP / Tailscale |
+
+托盘菜单：启停 Daemon、立即探测、打开主窗、设置。外观主题（跟随系统 / 浅色 / 深色）由 HandyControl 皮肤 + 自有色板同步。
 
 ### 2.3 导出报告
 
 ```powershell
-# Markdown（默认）
-netstrata --export --minutes 60 -o report.md
-
-# JSON
-netstrata --export --minutes 120 --format json -o report.json
-
-# 输出到 stdout（管道/重定向）
-netstrata --export --minutes 30 | Out-File -Encoding utf8 report.md
+NetStrata --export --minutes 60 -o report.md
+NetStrata --export --minutes 120 --format json -o report.json
+NetStrata --export --minutes 30 | Out-File -Encoding utf8 report.md
 ```
-
-报告含：时间范围、overall 分布、各层统计、自定义 ping 摘要、近期告警、结论节选。
 
 ### 2.4 TUI
 
 ```powershell
-netstrata                    # 默认：有 state 则读 state，否则现场采集
-netstrata --follow           # 只读 daemon，等待 state 出现
-$env:NETSTRATA_LANG = 'zh'   # 或 TUI 内按 l 切换
-netstrata
+NetStrata --tui
+NetStrata --follow
+$env:NETSTRATA_LANG = 'zh'
+NetStrata --tui
 ```
 
 ---
@@ -91,15 +94,18 @@ netstrata
 
 | 字段 | 说明 |
 |------|------|
-| `pingExtra` | 额外 ping 目标（最多 10 个） |
-| `pingExtraLabels` | 目标 → 显示名，如 `"192.168.1.50": "nas"` |
-| `tlsStackTargets` | 覆盖 TLS 栈探测主机，如 `["github.com", "api.anthropic.com:443"]` |
+| `intervalMs` | 探测间隔 |
+| `port` | 预留（Web 后续） |
+| `lang` | 界面语言 `zh` / `en` / `auto`（默认中文） |
+| `theme` | `system` / `light` / `dark` |
+| `pingExtra` | 额外 ping 目标（最多 10 个；主窗「自定义目标」页编辑） |
+| `pingExtraLabels` | 目标 → 显示名 |
+| `httpsExtra` | 额外 HTTPS 探测 URL（自定义目标页添加） |
+| `tlsStackTargets` | 覆盖 TLS 栈探测主机 |
 
-优先级（高 → 低）：
+设置窗口保存语言/主题/间隔/TLS/开机启动后会**热重载**进程内 Daemon；自定义目标在主窗 Targets Tab 维护，不会被设置页清空。
 
-1. CLI 单次：`--ping`
-2. 环境变量：`NETSTRATA_PING_EXTRA`
-3. `config.json`
+优先级（高 → 低）：CLI `--ping` → `NETSTRATA_PING_EXTRA` → `config.json`。
 
 ---
 
@@ -108,12 +114,11 @@ netstrata
 | 变量 | 默认 | 说明 |
 |------|------|------|
 | `NETSTRATA_INTERVAL_MS` | `60000` | Daemon 探测间隔（毫秒） |
-| `NETSTRATA_PORT` | `8787` | Web 监听端口 |
-| `NETSTRATA_PROXY` | auto | 强制代理 URL；`none`/`off` 禁用自动检测 |
+| `NETSTRATA_PORT` | `8787` | 预留（Web 后续） |
+| `NETSTRATA_PROXY` | auto | 强制代理 URL；`none`/`off` 禁用 |
 | `NETSTRATA_LANG` | `auto` | `zh` / `en`（TUI） |
 | `NETSTRATA_DOWNLOAD_EVERY` | `10` | 每 N 轮测一次代理下载速度 |
 | `NETSTRATA_CONCLUSION_EVERY` | `30` | 每 N 轮重写 `conclusions.md` |
-| `NETSTRATA_NO_OPEN` | `0` | `1` = `--web` 时不打开浏览器 |
 | `NETSTRATA_PING_EXTRA` | — | 逗号分隔额外 ping，最多 10 个 |
 
 ---
@@ -124,27 +129,22 @@ netstrata
 
 ```
 %APPDATA%\NetStrata\
-├── config.json           # 用户配置
+├── config.json
 ├── data\
-│   ├── samples.jsonl     # 历史样本（每行一个 Sample JSON）
-│   ├── state.json        # Daemon 最新状态 + recentAlerts
-│   └── conclusions.md    # 周期性 Markdown 结论
+│   ├── samples.jsonl
+│   ├── state.json
+│   └── conclusions.md
 └── logs\
-    └── daemon.log        # Daemon 文本日志
+    └── daemon.log
 ```
 
 ### 5.1 快速检查
 
 ```powershell
-# 最新判决
 Get-Content "$env:APPDATA\NetStrata\data\state.json" | ConvertFrom-Json |
   Select-Object -ExpandProperty latest |
   Select-Object -ExpandProperty verdict
 
-# 最近告警
-(Get-Content "$env:APPDATA\NetStrata\data\state.json" | ConvertFrom-Json).recentAlerts
-
-# Daemon 日志尾部
 Get-Content "$env:APPDATA\NetStrata\logs\daemon.log" -Tail 20
 ```
 
@@ -153,20 +153,14 @@ Get-Content "$env:APPDATA\NetStrata\logs\daemon.log" -Tail 20
 ## 6. 验收命令（冒烟）
 
 ```powershell
-dotnet test
+dotnet test --filter "Category!=Integration"
 
-# 单次 JSON（应含 verdict.overall）
-netstrata --once | ConvertFrom-Json | Select-Object -ExpandProperty verdict
+NetStrata --once | ConvertFrom-Json | Select-Object -ExpandProperty verdict
 
-# Web（另开终端，需先 build/run）
-$env:NETSTRATA_NO_OPEN = '1'
-$env:NETSTRATA_INTERVAL_MS = '20000'
-netstrata --web
-# Invoke-RestMethod http://localhost:8787/api/state
-# Invoke-RestMethod http://localhost:8787/api/conclusions
+dotnet run --project src/NetStrata.Tray
+# 托盘图标应变色；打开 Dashboard 应约 5s 刷新
 
-# 导出
-netstrata --export --minutes 60 -o $env:TEMP\netstrata-report.md
+NetStrata --export --minutes 60 -o $env:TEMP\netstrata-report.md
 ```
 
 ---
@@ -175,8 +169,7 @@ netstrata --export --minutes 60 -o $env:TEMP\netstrata-report.md
 
 | 文档 | 内容 |
 |------|------|
-| [SCHEDULING.md](SCHEDULING.md) | CLI / 任务计划 / Cursor Loop / MCP 与 HTTP 调度 |
-| [API.md](API.md) | Web HTTP 端点 |
+| [SCHEDULING.md](SCHEDULING.md) | CLI / 任务计划 / Cursor Loop |
 | [SPEC.md](SPEC.md) | 探测与判决规格 |
-| [LAYER3.md](LAYER3.md) | TLS 栈、告警、导出 |
-| [ROADMAP.md](ROADMAP.md) | 分期计划（当前 Phase 0–5 已完成） |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | 解决方案结构 |
+| [WPF-ROADMAP.md](WPF-ROADMAP.md) | WPF 与单 exe 架构 |

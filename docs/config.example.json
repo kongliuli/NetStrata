@@ -1,10 +1,13 @@
 {
   "intervalMs": 60000,
   "port": 8787,
+  "lang": "zh",
+  "theme": "system",
   "pingExtra": ["192.168.1.50", "10.0.0.1"],
   "pingExtraLabels": {
     "192.168.1.50": "nas",
     "10.0.0.1": "vpn-peer"
   },
+  "httpsExtra": ["https://example.com/"],
   "tlsStackTargets": ["github.com", "api.anthropic.com", "www.google.com"]
 }

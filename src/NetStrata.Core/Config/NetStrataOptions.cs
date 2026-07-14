@@ -11,7 +11,9 @@ public sealed class NetStrataOptions
     public IReadOnlyDictionary<string, string> PingExtraLabels { get; init; } =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     public IReadOnlyList<string> TlsStackTargets { get; init; } = [];
-    public string Lang { get; init; } = "auto";
+    public IReadOnlyList<string> HttpsExtra { get; init; } = [];
+    public string Lang { get; init; } = "zh";
+    public string Theme { get; init; } = "system";
     public int DownloadEvery { get; init; } = 10;
     public int ConclusionEvery { get; init; } = 30;
     public bool NoOpen { get; init; }
@@ -30,7 +32,13 @@ public sealed class NetStrataOptions
             PingExtra = pingExtra,
             PingExtraLabels = config.PingExtraLabels,
             TlsStackTargets = config.TlsStackTargets,
-            Lang = Environment.GetEnvironmentVariable("NETSTRATA_LANG") ?? "auto",
+            HttpsExtra = config.HttpsExtra,
+            Lang = Environment.GetEnvironmentVariable("NETSTRATA_LANG")
+                   ?? config.Lang
+                   ?? "zh",
+            Theme = Environment.GetEnvironmentVariable("NETSTRATA_THEME")
+                    ?? config.Theme
+                    ?? "system",
             DownloadEvery = ParseInt(Environment.GetEnvironmentVariable("NETSTRATA_DOWNLOAD_EVERY"), 10),
             ConclusionEvery = ParseInt(Environment.GetEnvironmentVariable("NETSTRATA_CONCLUSION_EVERY"), 30),
             NoOpen = Environment.GetEnvironmentVariable("NETSTRATA_NO_OPEN") == "1",

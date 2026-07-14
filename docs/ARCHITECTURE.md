@@ -5,21 +5,21 @@
 ```
 NetStrata/
 ├── src/
-│   ├── NetStrata.Cli/                 # 入口：解析参数，分发模式
 │   ├── NetStrata.Core/                # 核心业务逻辑（无 UI 依赖）
 │   │   ├── Probes/                    # 各探测项实现
 │   │   ├── Judge/                     # 分层判决引擎
 │   │   ├── Collector/                 # 并行采集调度
 │   │   ├── Models/                    # 数据模型
 │   │   ├── Config/                    # 环境变量 / 选项
+│   │   ├── Cli/                       # 进程内 Daemon / Once / 参数解析
 │   │   └── Storage/                   # jsonl / state 读写
-│   ├── NetStrata.Daemon/              # 后台循环探测 HostedService
-│   └── NetStrata.Web/                 # ASP.NET Core Minimal API + 静态文件
+│   ├── NetStrata.Daemon/              # ProbeDaemon 循环
+│   └── NetStrata.Tray/                # NetStrata.exe：WPF 托盘 + CLI 分发
 ├── tests/
-│   └── NetStrata.Core.Tests/          # 单元测试（mock 探测，不真弹窗）
-├── docs/                              # 本文档集
-├── web/                               # 前端静态资源（移植 canireach 或重写）
-├── NetStrata.sln
+│   └── NetStrata.Core.Tests/          # 单元测试（mock，不启 GUI/真进程）
+├── docs/
+├── web/                               # 静态资源（Web 仪表盘后续）
+├── NetStrata.slnx
 └── README.md
 ```
 
@@ -29,19 +29,17 @@ NetStrata/
 
 ```mermaid
 flowchart TB
-    Cli[NetStrata.Cli] --> Core[NetStrata.Core]
-    Cli --> Daemon[NetStrata.Daemon]
-    Cli --> Web[NetStrata.Web]
+    Tray[NetStrata.Tray] --> Core[NetStrata.Core]
+    Tray --> Daemon[NetStrata.Daemon]
     Daemon --> Core
-    Web --> Core
-    Web --> Daemon
 ```
 
 **依赖规则**：
-- `Core` 不依赖 `Web` / `Cli` / `Daemon`
+- `Core` 不依赖 `Tray` / `Daemon`
 - 所有探测逻辑在 `Core`，便于单元测试
 - `Daemon` 仅负责定时调用 `SampleCollector` + 持久化
-
+- Tray 进程内跑 `ProbeDaemon`；CLI 子命令由同 exe `CommandDispatcher` 分发
+- Web 仪表盘本阶段不做
 ---
 
 ## 核心接口
@@ -243,39 +241,13 @@ public interface ISampleStorage
 
 ## CLI 入口
 
-```csharp
-// NetStrata.Cli/Program.cs
-var mode = args switch
-{
-    var a when a.Contains("--once") => RunMode.Once,
-    var a when a.Contains("--web")  => RunMode.Web,
-    _                               => RunMode.Tui,
-};
-```
-
-使用 `System.CommandLine` 解析参数（可选）。
+同一 `NetStrata.exe`：无参 → 托盘；`--once` / `--export` / `--tui` / `--follow` / `--help` → `CommandDispatcher`。`--web` 本阶段返回未启用提示。
 
 ---
 
 ## 配置
 
-```csharp
-public sealed class NetStrataOptions
-{
-    public int IntervalMs { get; init; } = 60_000;
-    public int Port { get; init; } = 8787;
-    public string? ProxyOverride { get; init; }
-    public IReadOnlyList<string> PingExtra { get; init; } = [];
-    public string Lang { get; init; } = "auto";
-    public int DownloadEvery { get; init; } = 10;
-    public int ConclusionEvery { get; init; } = 30;
-    public bool NoOpen { get; init; }
-    public string DataDir { get; init; } = /* %APPDATA%/NetStrata/data */;
-    public string ConfigPath { get; init; } = /* %APPDATA%/NetStrata/config.json */;
-}
-```
-
-从环境变量 `NETSTRATA_*` 与 `config.json` 加载。`PingExtra` 合并顺序：config → env → CLI `--ping`（当次）。
+从环境变量 `NETSTRATA_*` 与 `config.json` 加载。`PingExtra` 合并顺序：config → env → CLI `--ping`（当次）。托盘设置保存后热重载进程内 Daemon。
 
 ---
 
@@ -286,14 +258,10 @@ public sealed class NetStrataOptions
 | 测什么 | 怎么测 |
 |--------|--------|
 | `VerdictEngine` | 纯输入 Sample → 断言 verdict，无 I/O |
-| `ProxyDetector` | mock 注册表 reader |
-| `HttpsProbe` | mock `HttpMessageHandler`，断言 URL/Proxy |
-| `PingProbe` | mock `IPingService` |
-| `RouteWatch` / `ConclusionEngine` | 纯函数，Sample 列表 → alerts / Markdown |
-| `TlsStackProbe` | mock TCP/TLS，或 Integration |
+| `InProcessDaemonController` | 注入 loop 委托，断言 Start/Stop/Restart |
+| `OnceProbeRunner` | mock `ISampleCollector` |
+| `RouteWatch` / `ConclusionEngine` | 纯函数 |
 | 集成测试 | `[Trait("Category", "Integration")]`，默认跳过 |
-
-完整用例表见 [TESTING.md](TESTING.md)。
 
 **禁止**在单元测试中 `Process.Start` 真实浏览器或系统 exe。
 
@@ -302,7 +270,7 @@ public sealed class NetStrataOptions
 ## 发布
 
 ```powershell
-dotnet publish src/NetStrata.Cli -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
+.\scripts\publish.ps1
 ```
 
-输出：`netstrata.exe`（单文件，无运行时依赖）
+输出：`artifacts/publish/NetStrata.exe`（WPF + CLI 单文件）

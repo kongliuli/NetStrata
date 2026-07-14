@@ -10,22 +10,19 @@ NetStrata 是受 [canireach](https://github.com/canireach/canireach) 启发的 .
 git clone git@github.com:kongliuli/NetStrata.git
 cd NetStrata
 dotnet test
-dotnet run --project src/NetStrata.Cli -- --once
+dotnet run --project src/NetStrata.Tray -- --once
 
-# 常驻监控 + 仪表盘
-$env:NETSTRATA_NO_OPEN = '1'
-dotnet run --project src/NetStrata.Cli -- --web
-# http://localhost:8787
+# 托盘 UI + 进程内 Daemon（默认）
+dotnet run --project src/NetStrata.Tray
 
-# 单文件发布（CLI + 托盘）
-dotnet publish src/NetStrata.Cli/NetStrata.Cli.csproj -c Release -r win-x64 -o artifacts/publish
-dotnet publish src/NetStrata.Tray/NetStrata.Tray.csproj -c Release -r win-x64 -o artifacts/publish
-# 或：.\scripts\publish.ps1
-.\artifacts\publish\netstrata.exe --help
-.\artifacts\publish\netstrata-tray.exe
+# 单文件发布
+.\scripts\publish.ps1
+.\artifacts\publish\NetStrata.exe
+.\artifacts\publish\NetStrata.exe --help
+.\artifacts\publish\NetStrata.exe --once
 ```
 
-完整用法见 **[docs/USAGE.md](docs/USAGE.md)**；CLI / 任务计划 / Cursor Loop / MCP 集成见 **[docs/SCHEDULING.md](docs/SCHEDULING.md)**。
+完整用法见 **[docs/USAGE.md](docs/USAGE.md)**；CLI / 任务计划 / Cursor Loop 见 **[docs/SCHEDULING.md](docs/SCHEDULING.md)**。
 
 ## 产品定位
 
@@ -33,33 +30,34 @@ dotnet publish src/NetStrata.Tray/NetStrata.Tray.csproj -c Release -r win-x64 -o
 |------|------|
 | **目标用户** | 需要监控网络稳定性、代理链路健康、AI API 可达性的 Windows 开发者 |
 | **核心价值** | 分层定位故障，而非笼统的「网断了」 |
-| **运行形态** | CLI + 本地 Web 仪表盘 + TUI |
-| **技术栈** | .NET 8+ / C# |
+| **运行形态** | **WPF 主窗 + 托盘（主）** + 同 exe CLI / TUI |
+| **技术栈** | .NET 8+ / C# / WPF / HandyControl |
 
-## CLI 速查
+## CLI 速查（同一 `NetStrata.exe`）
 
 | 命令 | 说明 |
 |------|------|
-| `netstrata` | TUI 默认模式 |
-| `netstrata --follow` | TUI 只读 daemon state |
-| `netstrata --once` | 单次探测，JSON 到 stdout |
-| `netstrata --once --ping IP` | 附加自定义 ping |
-| `netstrata --web` | Web + 后台 Daemon |
-| `netstrata --export -o report.md` | 导出诊断报告 |
-| `netstrata --help` | 帮助 |
+| `NetStrata` | 主窗 + 托盘 + 进程内 Daemon（默认） |
+| `NetStrata --tui` | TUI |
+| `NetStrata --follow` | TUI 只读 daemon state |
+| `NetStrata --once` | 单次探测，JSON 到 stdout |
+| `NetStrata --once --ping IP` | 附加自定义 ping |
+| `NetStrata --export -o report.md` | 导出诊断报告 |
+| `NetStrata --help` | 帮助 |
+
+> `--web` 本阶段未启用；探测由托盘进程内 Daemon 完成。Web 仪表盘后续再做。
 
 ## 环境变量
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
 | `NETSTRATA_INTERVAL_MS` | `60000` | 探测间隔 |
-| `NETSTRATA_PORT` | `8787` | Web 端口 |
+| `NETSTRATA_PORT` | `8787` | 预留（Web 后续） |
 | `NETSTRATA_PROXY` | auto | 代理 URL；`none`/`off` 禁用 |
 | `NETSTRATA_PING_EXTRA` | — | 额外 ping（逗号分隔，最多 10） |
 | `NETSTRATA_CONCLUSION_EVERY` | `30` | 每 N 轮写 conclusions.md |
 | `NETSTRATA_DOWNLOAD_EVERY` | `10` | 每 N 轮测代理下载 |
 | `NETSTRATA_LANG` | auto | TUI 语言 `zh`/`en` |
-| `NETSTRATA_NO_OPEN` | `0` | `1` 不自动开浏览器 |
 
 配置：`%APPDATA%\NetStrata\config.json`（示例 [docs/config.example.json](docs/config.example.json)）。
 
@@ -68,34 +66,30 @@ dotnet publish src/NetStrata.Tray/NetStrata.Tray.csproj -c Release -r win-x64 -o
 | 文档 | 内容 |
 |------|------|
 | **[docs/USAGE.md](docs/USAGE.md)** | **安装、命令、配置、数据目录、验收** |
-| **[docs/SCHEDULING.md](docs/SCHEDULING.md)** | **CLI/任务计划/Cursor Loop/MCP 与 HTTP 调度** |
+| **[docs/SCHEDULING.md](docs/SCHEDULING.md)** | **CLI/任务计划/Cursor Loop** |
 | [docs/PRODUCT.md](docs/PRODUCT.md) | 产品定义、命名 |
 | [docs/SPEC.md](docs/SPEC.md) | 探测项与判决规则 |
 | [docs/DATA-MODEL.md](docs/DATA-MODEL.md) | Sample / Verdict JSON |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 解决方案结构 |
 | [docs/WINDOWS.md](docs/WINDOWS.md) | Windows 探测对照 |
-| [docs/API.md](docs/API.md) | Web HTTP API |
 | [docs/LAYER3.md](docs/LAYER3.md) | TLS 栈、告警、导出 |
 | [docs/TESTING.md](docs/TESTING.md) | 测试规格 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 分期计划 |
-| [docs/WPF-ROADMAP.md](docs/WPF-ROADMAP.md) | WPF 托盘分步路线图（W6a–W6h） |
+| [docs/WPF-ROADMAP.md](docs/WPF-ROADMAP.md) | WPF 与单 exe 架构 |
 | [scripts/README.md](scripts/README.md) | agent-loop、health-check |
 
 ## 调度与 Agent
 
-- **CLI**：`netstrata --once` / `--export` 适合脚本与 CI
-- **HTTP**：`netstrata --web` 后访问 `/api/state`、`/api/export` 等
+- **CLI**：`NetStrata --once` / `--export` 适合脚本与 CI
 - **文件**：`%APPDATA%\NetStrata\data\state.json`、`samples.jsonl`
 - **开发循环**：`scripts/agent-loop.ps1` 或 Cursor `/loop 5m`
 - **健康检查**：`scripts/health-check.ps1`
-
-NetStrata 暂无专用 MCP Server；Agent 通过 Shell + HTTP + 读文件集成（详见 SCHEDULING.md）。
 
 ## 仓库状态
 
 **Phase 0–5 已完成**（含 Layer 3：TLS 栈、RouteWatch 告警、导出、结论引擎）。
 
-**Phase W6 已完成**（托盘、Dashboard、设置、Daemon 启停、告警、开机自启、发布），见 [docs/WPF-ROADMAP.md](docs/WPF-ROADMAP.md)。
+**Phase W6 已完成**；**单 exe 重构已完成**：WPF 托盘为主入口，进程内 Daemon，CLI 为同 exe 子命令。Web 仪表盘延后。
 
 ## 许可证
 

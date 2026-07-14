@@ -5,7 +5,7 @@ using NetStrata.Core.Storage;
 using NetStrata.Core.Tui;
 using Spectre.Console;
 
-namespace NetStrata.Cli;
+namespace NetStrata.Tray.Cli;
 
 public static class TuiRunner
 {
@@ -15,12 +15,12 @@ public static class TuiRunner
         var collector = new SampleCollector();
         var session = new TuiSession
         {
-            Lang = options.Lang.StartsWith("zh", StringComparison.OrdinalIgnoreCase) ? "zh" : "en"
+            Lang = NetStrata.Core.Ui.LangResolver.Resolve(options.Lang)
         };
 
         Console.CancelKeyPress += (_, e) => { session.Running = false; e.Cancel = true; };
 
-        await AnsiConsole.Live(new Panel("[grey]starting…[/]"))
+        await AnsiConsole.Live(new Spectre.Console.Panel("[grey]starting…[/]"))
             .StartAsync(async ctx =>
             {
                 while (session.Running && !ct.IsCancellationRequested)
@@ -59,19 +59,20 @@ public static class TuiRunner
         {
             PingExtra = options.PingExtra,
             ProxyOverride = options.ProxyOverride,
-            TlsStackTargets = options.TlsStackTargets
+            TlsStackTargets = options.TlsStackTargets,
+            HttpsExtra = options.HttpsExtra
         }, ct);
         return (sample, sample.Alerts);
     }
 
-    private static Panel Render(Sample? sample, IReadOnlyList<Alert> alerts, string lang, int intervalMs)
+    private static Spectre.Console.Panel Render(Sample? sample, IReadOnlyList<Alert> alerts, string lang, int intervalMs)
     {
         if (sample?.Verdict is null)
         {
             var msg = lang == "zh"
-                ? "等待 daemon 写入 state…\n运行 netstrata --web 或去掉 --follow"
-                : "Waiting for daemon state…\nRun netstrata --web or drop --follow";
-            return new Panel(msg) { Header = new PanelHeader("NetStrata"), Border = BoxBorder.Rounded };
+                ? "等待 daemon 写入 state…\n运行 NetStrata.exe（托盘）或去掉 --follow"
+                : "Waiting for daemon state…\nRun NetStrata.exe (tray) or drop --follow";
+            return new Spectre.Console.Panel(msg) { Header = new PanelHeader("NetStrata"), Border = BoxBorder.Rounded };
         }
 
         var v = sample.Verdict;
@@ -102,7 +103,7 @@ public static class TuiRunner
                 new Markup($"[yellow]{Markup.Escape(alertLine)}[/]"),
                 new Markup(footer));
 
-        return new Panel(content)
+        return new Spectre.Console.Panel(content)
         {
             Header = new PanelHeader("NetStrata"),
             Border = BoxBorder.Rounded

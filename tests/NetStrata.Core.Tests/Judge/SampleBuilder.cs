@@ -1,4 +1,5 @@
 using NetStrata.Core.Models;
+using NetStrata.Core.Probes;
 
 namespace NetStrata.Core.Tests.Judge;
 
@@ -39,7 +40,8 @@ internal static class SampleBuilder
             Https("taobao_direct", "direct", true),
             Https("google_direct", "direct", true),
             Https("cloudflare_direct", "direct", true),
-            Https("github_direct", "direct", true)
+            Https("github_site_direct", "direct", true),
+            ..AiApiCatalog.Providers.Select(p => Https($"{p.Id}_direct", "direct", true))
         ],
         ProxyConfig = new ProxyConfig()
     };
@@ -54,12 +56,12 @@ internal static class SampleBuilder
                 [
                     Https("google_direct", "direct", false),
                     Https("cloudflare_direct", "direct", false),
-                    Https("github_direct", "direct", false),
+                    Https("github_site_direct", "direct", false),
                     Https("google_proxy", "proxy", true),
                     Https("cloudflare_proxy", "proxy", true),
-                    Https("github_proxy", "proxy", true),
-                    Https("anthropic_proxy", "proxy", true),
-                    Https("openai_proxy", "proxy", true)
+                    Https("github_site_proxy", "proxy", true),
+                    ..AiApiCatalog.Providers.Select(p => Https($"{p.Id}_direct", "direct", false)),
+                    ..AiApiCatalog.Providers.Select(p => Https($"{p.Id}_proxy", "proxy", true))
                 ])
                 .GroupBy(h => h.Label)
                 .Select(g => g.Last())

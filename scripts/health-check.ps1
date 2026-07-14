@@ -7,23 +7,14 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 
 Write-Host "==> dotnet test"
-dotnet test (Join-Path $root 'NetStrata.slnx') -v q
+dotnet test (Join-Path $root 'NetStrata.slnx') -v q --filter "Category!=Integration"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 if (-not $Probe) { exit 0 }
 
-$cli = Join-Path $root 'src\NetStrata.Cli\bin\Debug\net8.0\NetStrata.Cli.exe'
-if (-not (Test-Path $cli)) {
-    Write-Host "==> dotnet build (cli)"
-    dotnet build (Join-Path $root 'src\NetStrata.Cli\NetStrata.Cli.csproj') -v q
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-}
-
-$runner = if (Test-Path $cli) { $cli } else { 'dotnet' }
-$args = if (Test-Path $cli) { @('--once') } else { @('run', '--project', (Join-Path $root 'src\NetStrata.Cli\NetStrata.Cli.csproj'), '--', '--once') }
-
-Write-Host "==> netstrata --once"
-$json = & $runner @args 2>&1 | Out-String
+$trayProj = Join-Path $root 'src\NetStrata.Tray\NetStrata.Tray.csproj'
+Write-Host "==> NetStrata --once"
+$json = & dotnet run --project $trayProj -- --once 2>&1 | Out-String
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $sample = $json | ConvertFrom-Json

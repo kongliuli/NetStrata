@@ -18,10 +18,9 @@ public sealed class HttpsProbe : IProbe<IReadOnlyList<HttpsResult>>
     [
         new("google_proxy", "https://www.google.com", "proxy"),
         new("cloudflare_proxy", "https://www.cloudflare.com", "proxy"),
-        new("github_proxy", "https://github.com", "proxy"),
+        new("github_site_proxy", "https://github.com", "proxy"),
         new("youtube_proxy", "https://www.youtube.com", "proxy"),
-        new("anthropic_proxy", "https://api.anthropic.com/", "proxy", AcceptAnyCode: true),
-        new("openai_proxy", "https://api.openai.com/", "proxy", AcceptAnyCode: true)
+        ..AiApiCatalog.ProxyTargets()
     ];
 
     public static readonly HttpTarget[] DirectTargets =
@@ -30,9 +29,8 @@ public sealed class HttpsProbe : IProbe<IReadOnlyList<HttpsResult>>
         new("taobao_direct", "https://www.taobao.com", "direct"),
         new("google_direct", "https://www.google.com", "direct"),
         new("cloudflare_direct", "https://www.cloudflare.com", "direct"),
-        new("github_direct", "https://github.com", "direct"),
-        new("anthropic_direct", "https://api.anthropic.com/", "direct", AcceptAnyCode: true),
-        new("openai_direct", "https://api.openai.com/", "direct", AcceptAnyCode: true)
+        new("github_site_direct", "https://github.com", "direct"),
+        ..AiApiCatalog.DirectTargets()
     ];
 
     private readonly TimeSpan _timeout = TimeSpan.FromSeconds(8);

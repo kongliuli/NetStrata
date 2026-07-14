@@ -1,5 +1,9 @@
-using System.Diagnostics;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
+using NetStrata.Core.Collector;
+using NetStrata.Core.Config;
+using NetStrata.Core.Models;
 
 namespace NetStrata.Core.Cli;
 
@@ -15,84 +19,70 @@ public interface IOnceProbeRunner
     Task<OnceProbeResult> RunAsync(CancellationToken ct = default);
 }
 
+public interface ISampleCollector
+{
+    Task<Sample> CollectAsync(CollectOptions? options = null, CancellationToken ct = default);
+}
+
+public sealed class SampleCollectorAdapter(SampleCollector inner) : ISampleCollector
+{
+    public Task<Sample> CollectAsync(CollectOptions? options = null, CancellationToken ct = default) =>
+        inner.CollectAsync(options, ct);
+}
+
+/// <summary>
+/// In-process single probe (no Process.Start).
+/// </summary>
 public sealed class OnceProbeRunner : IOnceProbeRunner
 {
-    private readonly Func<string> _resolveExecutable;
-    private readonly Func<ProcessStartInfo, CancellationToken, Task<(int ExitCode, string Stdout)>> _execute;
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        WriteIndented = false,
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver()
+    };
+
+    private readonly ISampleCollector _collector;
+    private readonly Func<NetStrataOptions> _optionsFactory;
 
     public OnceProbeRunner(
-        Func<string>? resolveExecutable = null,
-        Func<ProcessStartInfo, CancellationToken, Task<(int ExitCode, string Stdout)>>? execute = null)
+        ISampleCollector? collector = null,
+        Func<NetStrataOptions>? optionsFactory = null)
     {
-        _resolveExecutable = resolveExecutable ?? (() => CliPathResolver.ResolveExecutable());
-        _execute = execute ?? ExecuteProcessAsync;
+        _collector = collector ?? new SampleCollectorAdapter(new SampleCollector());
+        _optionsFactory = optionsFactory ?? NetStrataOptions.FromEnvironment;
     }
 
     public async Task<OnceProbeResult> RunAsync(CancellationToken ct = default)
     {
-        var exe = _resolveExecutable();
-        var info = BuildStartInfo(exe);
-        if (info is null)
-            return new OnceProbeResult(false, null, null, "cannot resolve netstrata executable", null);
-
         try
         {
-            var (exitCode, stdout) = await _execute(info, ct);
-            if (exitCode != 0)
-                return new OnceProbeResult(false, null, null, $"exit {exitCode}", stdout);
+            var options = _optionsFactory();
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            linked.CancelAfter(TimeSpan.FromSeconds(30));
 
-            return OnceProbeParser.Parse(stdout);
+            var sample = await _collector.CollectAsync(new CollectOptions
+            {
+                PingExtra = options.PingExtra,
+                PingExtraLabels = options.PingExtraLabels,
+                ProxyOverride = options.ProxyOverride,
+                TlsStackTargets = options.TlsStackTargets,
+                HttpsExtra = options.HttpsExtra
+            }, linked.Token);
+
+            var json = JsonSerializer.Serialize(sample, JsonOptions);
+            return new OnceProbeResult(
+                true,
+                sample.Verdict?.Overall,
+                sample.Verdict?.Headline,
+                null,
+                json);
         }
         catch (Exception ex)
         {
             return new OnceProbeResult(false, null, null, ex.Message, null);
         }
-    }
-
-    public static ProcessStartInfo? BuildStartInfo(string exe)
-    {
-        if (exe.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
-        {
-            return new ProcessStartInfo("dotnet", $"\"{exe}\" --once")
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-        }
-
-        if (exe.Equals("netstrata", StringComparison.OrdinalIgnoreCase))
-        {
-            return new ProcessStartInfo(exe, "--once")
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-        }
-
-        if (!File.Exists(exe) && !exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-            return null;
-
-        return new ProcessStartInfo(exe, "--once")
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
-    }
-
-    private static async Task<(int ExitCode, string Stdout)> ExecuteProcessAsync(
-        ProcessStartInfo info,
-        CancellationToken ct)
-    {
-        using var process = Process.Start(info)!;
-        var stdout = await process.StandardOutput.ReadToEndAsync(ct);
-        await process.WaitForExitAsync(ct);
-        return (process.ExitCode, stdout);
     }
 }
 

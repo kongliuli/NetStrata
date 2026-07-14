@@ -43,4 +43,31 @@ public sealed class SettingsMapperTests
                 File.Delete(path);
         }
     }
+
+    [Fact]
+    public void FromForm_EmptyPingKeepsExistingTargets()
+    {
+        var existing = new UserConfig
+        {
+            PingExtra = ["192.168.1.50"],
+            PingExtraLabels = new Dictionary<string, string> { ["192.168.1.50"] = "nas" },
+            HttpsExtra = ["https://example.com/"]
+        };
+
+        var back = SettingsMapper.FromForm(new SettingsFormModel
+        {
+            IntervalMs = "60000",
+            Port = "8787",
+            PingExtra = "",
+            PingLabels = "",
+            TlsStackTargets = "github.com",
+            Lang = "zh",
+            Theme = "dark"
+        }, existing);
+
+        Assert.Equal("192.168.1.50", Assert.Single(back.PingExtra));
+        Assert.Equal("nas", back.PingExtraLabels["192.168.1.50"]);
+        Assert.Equal("https://example.com/", Assert.Single(back.HttpsExtra));
+        Assert.Equal("dark", back.Theme);
+    }
 }

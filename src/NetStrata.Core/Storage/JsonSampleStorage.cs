@@ -8,7 +8,9 @@ public sealed class JsonSampleStorage : ISampleStorage
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = true,
+        // PublishTrimmed disables reflection JSON; keep resolver explicit for Debug/Release.
+        TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver()
     };
 
     private readonly string _jsonlPath;

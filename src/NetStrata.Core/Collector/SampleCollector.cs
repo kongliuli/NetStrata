@@ -14,6 +14,7 @@ public sealed class CollectOptions
     public IReadOnlyDictionary<string, string> PingExtraLabels { get; init; } =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     public IReadOnlyList<string> TlsStackTargets { get; init; } = [];
+    public IReadOnlyList<string> HttpsExtra { get; init; } = [];
     public string? ProxyOverride { get; init; }
     public bool WithDownload { get; init; }
 }
@@ -80,9 +81,15 @@ public sealed class SampleCollector
                 ct: ct));
         }
 
-        var httpsTargets = proxyUrl is not null
-            ? HttpsProbe.DirectTargets.Concat(HttpsProbe.ProxyTargets).ToArray()
-            : HttpsProbe.DirectTargets;
+        var extras = options.HttpsExtra
+            .Where(u => !string.IsNullOrWhiteSpace(u))
+            .Select((u, i) => new HttpTarget($"user_{i}_direct", u.Trim(), "direct", AcceptAnyCode: true))
+            .ToArray();
+        var httpsTargets = (proxyUrl is not null
+                ? HttpsProbe.DirectTargets.Concat(HttpsProbe.ProxyTargets)
+                : HttpsProbe.DirectTargets.AsEnumerable())
+            .Concat(extras)
+            .ToArray();
 
         var dnsTask = _dnsProbe.ProbeAsync(ct);
         var httpsTask = _httpsProbe.ProbeTargetsAsync(httpsTargets, proxyUrl, ct);

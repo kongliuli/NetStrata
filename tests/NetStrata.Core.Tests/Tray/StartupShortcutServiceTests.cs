@@ -18,9 +18,9 @@ public sealed class StartupShortcutServiceTests
     {
         var writer = new FakeWriter();
         var svc = new StartupShortcutService(writer, () => @"C:\Startup");
-        svc.Enable(@"C:\Apps\netstrata-tray.exe");
+        svc.Enable(@"C:\Apps\NetStrata.exe");
         Assert.Equal(@"C:\Startup\NetStrata Tray.lnk", writer.CreatedPath);
-        Assert.Equal(@"C:\Apps\netstrata-tray.exe", writer.TargetPath);
+        Assert.Equal(@"C:\Apps\NetStrata.exe", writer.TargetPath);
     }
 
     [Fact]

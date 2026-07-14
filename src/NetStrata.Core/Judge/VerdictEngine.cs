@@ -1,13 +1,13 @@
 using NetStrata.Core.Models;
+using NetStrata.Core.Probes;
 
 namespace NetStrata.Core.Judge;
 
 public sealed class VerdictEngine
 {
-    private static readonly HashSet<string> DomesticDirectLabels =
-    [
-        "baidu_direct", "taobao_direct", "anthropic_direct", "openai_direct"
-    ];
+    private static readonly HashSet<string> DomesticDirectLabels = new(
+        new[] { "baidu_direct", "taobao_direct" }.Concat(AiApiCatalog.Providers.Select(p => $"{p.Id}_direct")),
+        StringComparer.OrdinalIgnoreCase);
 
     public Verdict Judge(Sample sample)
     {
@@ -292,63 +292,67 @@ public sealed class VerdictEngine
         });
 
         var aiReasons = new List<string>();
-        var antD = sample.Https.FirstOrDefault(h => h.Label == "anthropic_direct");
-        var antP = sample.Https.FirstOrDefault(h => h.Label == "anthropic_proxy");
-        var oaiD = sample.Https.FirstOrDefault(h => h.Label == "openai_direct");
-        var oaiP = sample.Https.FirstOrDefault(h => h.Label == "openai_proxy");
+        var providerCount = AiApiCatalog.Providers.Length;
+        var directHits = 0;
+        var proxyHits = 0;
+        var metrics = new Dictionary<string, object?>();
+        foreach (var p in AiApiCatalog.Providers)
+        {
+            var d = sample.Https.FirstOrDefault(h => h.Label == $"{p.Id}_direct");
+            var pr = sample.Https.FirstOrDefault(h => h.Label == $"{p.Id}_proxy");
+            var dOk = DirectOk(d);
+            var pOk = ProxyOk(pr);
+            if (dOk) directHits++;
+            if (pOk) proxyHits++;
+            metrics[$"{p.Id}DirectOk"] = dOk;
+            metrics[$"{p.Id}ProxyOk"] = pOk;
+            if (!dOk && d?.Err is { } derr)
+                aiReasons.Add($"{p.DisplayName} 直连: {derr}");
+            if (!pOk && pr?.Err is { } perr)
+                aiReasons.Add($"{p.DisplayName} 代理: {perr}");
+        }
 
-        var proxyHits = new[] { ProxyOk(antP), ProxyOk(oaiP) }.Count(x => x);
-        var directHits = new[] { DirectOk(antD), DirectOk(oaiD) }.Count(x => x);
         var noProxy = string.IsNullOrEmpty(sample.ProxyConfig.ProxyUrl);
-
         AiState aiState;
         string aiHeadline;
 
         if (noProxy)
         {
-            if (directHits == 2)
+            if (directHits == providerCount)
             {
                 aiState = AiState.DirectOnly;
-                aiHeadline = "Anthropic & OpenAI reachable directly (no proxy in use)";
+                aiHeadline = $"全部 {providerCount} 个 AI API 直连可达（未使用代理）";
             }
-            else if (directHits == 1)
+            else if (directHits > 0)
             {
                 aiState = AiState.Degraded;
-                var okName = DirectOk(antD) ? "Anthropic" : "OpenAI";
-                var failName = DirectOk(antD) ? "OpenAI" : "Anthropic";
-                aiHeadline = $"Only {okName} reachable; {failName} direct failed (no proxy configured)";
-                aiReasons.Add($"{failName} direct: {(DirectOk(antD) ? oaiD : antD)?.Err ?? "unknown"}");
+                aiHeadline = $"仅 {directHits}/{providerCount} 个 AI API 直连可达（未配置代理）";
             }
             else
             {
                 aiState = AiState.Fail;
-                aiHeadline =
-                    "Anthropic & OpenAI both unreachable directly; no proxy configured to fall back on";
+                aiHeadline = $"全部 AI API 直连不可达，且未配置代理";
             }
         }
-        else if (proxyState == LayerState.Fail && !DirectOk(antD) && !DirectOk(oaiD))
+        else if (proxyState == LayerState.Fail && directHits == 0)
         {
             aiState = AiState.Skipped;
             aiHeadline = "代理挂了且直连也不通，无法判断";
         }
-        else if (proxyHits == 2 && directHits >= 1)
+        else if (proxyHits == providerCount && directHits >= 1)
         {
             aiState = AiState.Ok;
-            aiHeadline =
-                $"Anthropic & OpenAI 均可达（代理稳定，部分直连也通：{directHits}/2）";
+            aiHeadline = $"全部 AI API 代理可达（直连 {directHits}/{providerCount}）";
         }
-        else if (proxyHits == 2)
+        else if (proxyHits == providerCount)
         {
             aiState = AiState.ProxyOnly;
-            aiHeadline = "Anthropic & OpenAI 通过代理可达，直连均被屏蔽";
+            aiHeadline = "全部 AI API 经代理可达，直连均被屏蔽";
         }
-        else if (proxyHits == 1)
+        else if (proxyHits > 0 && proxyHits < providerCount)
         {
             aiState = AiState.Degraded;
-            var okName = ProxyOk(antP) ? "Anthropic" : "OpenAI";
-            var failName = ProxyOk(antP) ? "OpenAI" : "Anthropic";
-            aiHeadline = $"仅 {okName} 代理可达；{failName} 代理失败";
-            aiReasons.Add($"{failName} via proxy: {(ProxyOk(antP) ? oaiP : antP)?.Err ?? "unknown"}");
+            aiHeadline = $"仅 {proxyHits}/{providerCount} 个 AI API 代理可达";
         }
         else if (directHits > 0)
         {
@@ -358,21 +362,15 @@ public sealed class VerdictEngine
         else
         {
             aiState = AiState.Fail;
-            aiHeadline = "Anthropic 与 OpenAI 均不可达（代理 & 直连都失败）";
+            aiHeadline = "全部 AI API 不可达（代理与直连均失败）";
         }
 
         layers.Add(new LayerVerdict
         {
             Layer = "ai",
             State = AiStateToLayerState(aiState),
-            Reasons = aiReasons,
-            Metrics = new Dictionary<string, object?>
-            {
-                ["anthropicProxyOk"] = ProxyOk(antP),
-                ["openaiProxyOk"] = ProxyOk(oaiP),
-                ["anthropicDirectOk"] = DirectOk(antD),
-                ["openaiDirectOk"] = DirectOk(oaiD)
-            }
+            Reasons = aiReasons.Take(6).ToList(),
+            Metrics = metrics
         });
 
         string overall;

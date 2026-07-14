@@ -1,11 +1,11 @@
-using System.Diagnostics;
-using System.IO;
 using System.Windows.Forms;
 using NetStrata.Core.Cli;
+using NetStrata.Core.Collector;
 using NetStrata.Core.Config;
 using NetStrata.Core.Storage;
-using NetStrata.Core.Models;
 using NetStrata.Core.Tui;
+using NetStrata.Daemon;
+using NetStrata.Tray.Views;
 
 namespace NetStrata.Tray.Services;
 
@@ -15,20 +15,20 @@ internal sealed class TrayHost : IDisposable
     private readonly System.Windows.Threading.DispatcherTimer _timer;
     private readonly JsonSampleStorage _storage = new();
     private readonly IOnceProbeRunner _probeRunner;
-    private readonly IDaemonLifecycle _daemon;
+    private readonly InProcessDaemonController _daemon;
     private readonly ContextMenuStrip _menu;
     private readonly ToolStripMenuItem _statusItem;
     private readonly ToolStripMenuItem _daemonItem;
     private readonly ToolStripMenuItem _probeItem;
-    private Views.DashboardWindow? _dashboard;
+    private MainWindow? _main;
     private Views.SettingsWindow? _settings;
     private readonly AlertWatchState _alerts = new();
     private bool _probing;
 
-    public TrayHost(IOnceProbeRunner? probeRunner = null, IDaemonLifecycle? daemon = null)
+    public TrayHost(IOnceProbeRunner? probeRunner = null, InProcessDaemonController? daemon = null)
     {
         _probeRunner = probeRunner ?? new OnceProbeRunner();
-        _daemon = daemon ?? new DaemonLifecycleManager();
+        _daemon = daemon ?? CreateDefaultDaemon();
         _menu = new ContextMenuStrip();
 
         _statusItem = new ToolStripMenuItem("等待数据…") { Enabled = false };
@@ -37,15 +37,15 @@ internal sealed class TrayHost : IDisposable
 
         _daemonItem = new ToolStripMenuItem("启动 Daemon", null, (_, _) => _ = ToggleDaemonAsync());
         _menu.Items.Add(_daemonItem);
-        _probeItem = new ToolStripMenuItem("立即探测 (--once)", null, (_, _) => _ = RunOnceAsync());
+        _probeItem = new ToolStripMenuItem("立即探测", null, (_, _) => _ = RunOnceAsync());
         _menu.Items.Add(_probeItem);
-        _menu.Items.Add("打开 Dashboard", null, (_, _) => OpenWpfDashboard());
-        _menu.Items.Add("打开 Web 仪表盘", null, (_, _) => OpenWebDashboard());
+        _menu.Items.Add("打开主窗口", null, (_, _) => ShowMain());
         _menu.Items.Add("设置…", null, (_, _) => OpenSettings());
         _menu.Items.Add("复制 headline", null, (_, _) => CopyHeadline());
         _menu.Items.Add(new ToolStripSeparator());
         _menu.Items.Add("退出", null, (_, _) => Shutdown());
         _icon.ContextMenuStrip = _menu;
+        _icon.DoubleClick += (_, _) => ShowMain();
 
         _timer = new System.Windows.Threading.DispatcherTimer
         {
@@ -54,11 +54,35 @@ internal sealed class TrayHost : IDisposable
         _timer.Tick += async (_, _) => await RefreshAsync();
     }
 
+    public void AttachMainWindow(MainWindow main) => _main = main;
+
+    public void RequestProbe() => _ = RunOnceAsync();
+
     public void Start()
     {
+        _ = StartDaemonOnLaunchAsync();
         _ = RefreshAsync();
         _timer.Start();
     }
+
+    private async Task StartDaemonOnLaunchAsync()
+    {
+        var (ok, err) = await _daemon.StartAsync();
+        if (!ok)
+            _icon.ShowBalloonTip(5000, "NetStrata", err ?? "Daemon 启动失败", ToolTipIcon.Error);
+        UpdateDaemonMenu();
+        await RefreshAsync();
+        _ = _main?.RefreshAsync();
+    }
+
+    private static InProcessDaemonController CreateDefaultDaemon() =>
+        new((options, ct) =>
+        {
+            DataDirectory.EnsureExists();
+            var storage = new JsonSampleStorage(options.DataDir);
+            var daemon = new ProbeDaemon(new SampleCollector(), storage, options);
+            return daemon.ProbeLoopAsync(ct);
+        }, NetStrataOptions.FromEnvironment());
 
     private async Task RefreshAsync()
     {
@@ -70,7 +94,7 @@ internal sealed class TrayHost : IDisposable
                 tray = tray with { Tooltip = headline };
 
             _statusItem.Text = state is null
-                ? BuildDaemonStatusLine(null)
+                ? BuildDaemonStatusLine()
                 : $"周期 #{state.Cycle} · {state.Latest?.Verdict?.Overall ?? "unknown"}";
             _lastHeadline = state?.Latest?.Verdict?.Headline;
 
@@ -98,41 +122,27 @@ internal sealed class TrayHost : IDisposable
 
     private void UpdateDaemonMenu()
     {
-        var port = NetStrataOptions.FromEnvironment().Port;
-        var ds = _daemon.GetStatus(port);
+        var ds = _daemon.GetStatus();
         if (ds.OwnedRunning)
         {
             _daemonItem.Text = "停止 Daemon";
             _daemonItem.Enabled = true;
         }
-        else if (ds.Mode == "external")
-        {
-            _daemonItem.Text = $"Daemon 外部占用 :{port}";
-            _daemonItem.Enabled = false;
-        }
         else
         {
-            _daemonItem.Text = "启动 Daemon (--web)";
+            _daemonItem.Text = "启动 Daemon";
             _daemonItem.Enabled = true;
         }
     }
 
-    private string BuildDaemonStatusLine(DaemonState? state)
-    {
-        var port = NetStrataOptions.FromEnvironment().Port;
-        var ds = _daemon.GetStatus(port);
-        if (state is not null)
-            return $"周期 #{state.Cycle} · {state.Latest?.Verdict?.Overall ?? "unknown"}";
-        return ds.Label;
-    }
+    private string BuildDaemonStatusLine() => _daemon.GetStatus().Label;
 
     private async Task ToggleDaemonAsync()
     {
-        var port = NetStrataOptions.FromEnvironment().Port;
-        var ds = _daemon.GetStatus(port);
+        var ds = _daemon.GetStatus();
         if (ds.OwnedRunning)
         {
-            _daemon.StopOwned();
+            _daemon.Stop();
             _icon.ShowBalloonTip(3000, "NetStrata", "Daemon 已停止", ToolTipIcon.Info);
             UpdateDaemonMenu();
             return;
@@ -140,13 +150,24 @@ internal sealed class TrayHost : IDisposable
 
         _daemonItem.Enabled = false;
         _daemonItem.Text = "启动中…";
-        var (ok, err) = await _daemon.StartAsync(port);
+        var (ok, err) = await _daemon.StartAsync();
         if (ok)
-            _icon.ShowBalloonTip(3000, "NetStrata", $"Daemon 已启动 :{port}", ToolTipIcon.Info);
+            _icon.ShowBalloonTip(3000, "NetStrata", "Daemon 已启动", ToolTipIcon.Info);
         else
             _icon.ShowBalloonTip(5000, "NetStrata", err ?? "启动失败", ToolTipIcon.Error);
 
         UpdateDaemonMenu();
+    }
+
+    internal Task<(bool Ok, string? Error)> RestartDaemonWithOptionsAsync(NetStrataOptions options) =>
+        RestartDaemonCoreAsync(options);
+
+    private async Task<(bool Ok, string? Error)> RestartDaemonCoreAsync(NetStrataOptions options)
+    {
+        var result = await _daemon.RestartAsync(options);
+        UpdateDaemonMenu();
+        _ = _main?.RefreshAsync();
+        return result;
     }
 
     private async Task RunOnceAsync()
@@ -172,13 +193,26 @@ internal sealed class TrayHost : IDisposable
             }
 
             await RefreshAsync();
+            _ = _main?.RefreshAsync();
         }
         finally
         {
             _probing = false;
             _probeItem.Enabled = true;
-            _probeItem.Text = "立即探测 (--once)";
+            _probeItem.Text = "立即探测";
         }
+    }
+
+    private void ShowMain()
+    {
+        if (_main is null)
+            return;
+        if (!_main.IsVisible)
+            _main.Show();
+        if (_main.WindowState == System.Windows.WindowState.Minimized)
+            _main.WindowState = System.Windows.WindowState.Normal;
+        _main.Activate();
+        _ = _main.RefreshAsync();
     }
 
     private void OpenSettings()
@@ -189,29 +223,9 @@ internal sealed class TrayHost : IDisposable
             return;
         }
 
-        _settings = new Views.SettingsWindow();
+        _settings = new Views.SettingsWindow(RestartDaemonWithOptionsAsync);
         _settings.Closed += (_, _) => _settings = null;
         _settings.Show();
-    }
-
-    private void OpenWpfDashboard()
-    {
-        if (_dashboard is { IsLoaded: true })
-        {
-            _dashboard.Activate();
-            _dashboard.Focus();
-            return;
-        }
-
-        _dashboard = new Views.DashboardWindow();
-        _dashboard.Closed += (_, _) => _dashboard = null;
-        _dashboard.Show();
-    }
-
-    private static void OpenWebDashboard()
-    {
-        var port = NetStrataOptions.FromEnvironment().Port;
-        Process.Start(new ProcessStartInfo($"http://localhost:{port}") { UseShellExecute = true });
     }
 
     private void CopyHeadline()
@@ -231,8 +245,7 @@ internal sealed class TrayHost : IDisposable
         _icon.Icon?.Dispose();
         _icon.Dispose();
         _menu.Dispose();
-        _dashboard?.Close();
         _settings?.Close();
-        _daemon.StopOwned();
+        _daemon.Dispose();
     }
 }
