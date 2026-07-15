@@ -112,7 +112,7 @@ public sealed class VerdictEngineTests
     {
         var verdict = _engine.Judge(SampleBuilder.Healthy());
         Assert.Equal("direct_only", verdict.Ai.State);
-        Assert.Contains("直连可达", verdict.Ai.Headline);
+        Assert.Contains("reachable direct", verdict.Ai.Headline);
     }
 
     [Fact]

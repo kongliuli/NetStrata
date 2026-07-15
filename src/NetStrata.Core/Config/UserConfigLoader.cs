@@ -33,6 +33,9 @@ public sealed class UserConfig
     /// <summary>system | light | dark.</summary>
     [JsonPropertyName("theme")]
     public string? Theme { get; init; }
+
+    [JsonPropertyName("judge")]
+    public JudgeConfig? Judge { get; init; }
 }
 
 public static class UserConfigLoader
@@ -104,7 +107,8 @@ public static class SettingsMapper
     public static UserConfig FromForm(SettingsFormModel form, UserConfig? existing = null)
     {
         int? interval = int.TryParse(form.IntervalMs.Trim(), out var iv) ? iv : null;
-        int? port = int.TryParse(form.Port.Trim(), out var pv) ? pv : null;
+        // port is reserved for future web dashboard — keep existing, do not edit from Settings
+        var port = existing?.Port;
 
         // ponytail: empty PingExtra in form means "keep existing" (Settings UI no longer edits targets)
         IReadOnlyList<string> pingExtra;
@@ -153,7 +157,8 @@ public static class SettingsMapper
             TlsStackTargets = tls,
             HttpsExtra = existing?.HttpsExtra ?? [],
             Lang = lang,
-            Theme = ThemeResolver.ToConfig(ThemeResolver.Parse(form.Theme))
+            Theme = ThemeResolver.ToConfig(ThemeResolver.Parse(form.Theme)),
+            Judge = existing?.Judge
         };
     }
 }

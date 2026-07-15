@@ -18,6 +18,7 @@ public sealed class NetStrataOptions
     public int ConclusionEvery { get; init; } = 30;
     public bool NoOpen { get; init; }
     public string DataDir { get; init; } = DataDirectory.DataPath;
+    public JudgeOptions Judge { get; init; } = JudgeOptions.Default;
 
     public static NetStrataOptions FromEnvironment()
     {
@@ -42,7 +43,8 @@ public sealed class NetStrataOptions
             DownloadEvery = ParseInt(Environment.GetEnvironmentVariable("NETSTRATA_DOWNLOAD_EVERY"), 10),
             ConclusionEvery = ParseInt(Environment.GetEnvironmentVariable("NETSTRATA_CONCLUSION_EVERY"), 30),
             NoOpen = Environment.GetEnvironmentVariable("NETSTRATA_NO_OPEN") == "1",
-            DataDir = DataDirectory.DataPath
+            DataDir = DataDirectory.DataPath,
+            Judge = JudgeOptions.FromConfig(config.Judge)
         };
     }
 

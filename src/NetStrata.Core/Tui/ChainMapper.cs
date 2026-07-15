@@ -119,9 +119,22 @@ public static class LocalNetMapper
                 : $"{WifiStatus(lang, wifi.Status)} · {wifi.Ssid ?? "?"} · RSSI {wifi.Rssi?.ToString() ?? "?"}"),
             (UiStrings.T(lang, "系统代理", "System proxy"), SummarizeProxy(lang, pc)),
             (UiStrings.T(lang, "出口 IP", "Egress IP"), sample.ProxyEgress?.Ip ?? "—"),
+            (UiStrings.T(lang, "Captive Portal", "Captive Portal"), sample.Captive is null
+                ? "—"
+                : sample.Captive.Ok
+                    ? UiStrings.T(lang, "正常", "OK")
+                    : $"{UiStrings.T(lang, "异常", "Issue")} · HTTP {sample.Captive.HttpCode}"),
+            (UiStrings.T(lang, "代理带宽", "Proxy bandwidth"), sample.ProxyDownload is null
+                ? "—"
+                : sample.ProxyDownload.Ok
+                    ? $"{sample.ProxyDownload.Mbps:F1} Mbps"
+                    : sample.ProxyDownload.Err ?? "—"),
             (UiStrings.T(lang, "Tailscale", "Tailscale"), sample.Tailscale is null
                 ? "—"
                 : $"{(sample.Tailscale.Installed ? UiStrings.T(lang, "已安装", "installed") : UiStrings.T(lang, "未安装", "missing"))} · {(sample.Tailscale.SignedIn ? UiStrings.T(lang, "已登录", "signed-in") : UiStrings.T(lang, "未登录", "signed-out"))} · {sample.Tailscale.Address ?? ""}"),
+            (UiStrings.T(lang, "TLS 洞察", "TLS insights"), sample.TlsStack is { Count: > 0 } tls
+                ? string.Join("; ", tls.Select(t => $"{t.Host}:{t.Verdict}").Take(4))
+                : "—"),
             (UiStrings.T(lang, "路由提示", "Route hints"), iface?.RouteHints is { Count: > 0 } h ? string.Join(", ", h) : "—")
         };
 

@@ -4,6 +4,7 @@ using System.Text.Json.Serialization.Metadata;
 using NetStrata.Core.Collector;
 using NetStrata.Core.Config;
 using NetStrata.Core.Models;
+using NetStrata.Core.Storage;
 
 namespace NetStrata.Core.Cli;
 
@@ -31,7 +32,7 @@ public sealed class SampleCollectorAdapter(SampleCollector inner) : ISampleColle
 }
 
 /// <summary>
-/// In-process single probe (no Process.Start).
+/// In-process single probe (no Process.Start). Persists to sample stream with trigger=manual.
 /// </summary>
 public sealed class OnceProbeRunner : IOnceProbeRunner
 {
@@ -45,13 +46,16 @@ public sealed class OnceProbeRunner : IOnceProbeRunner
 
     private readonly ISampleCollector _collector;
     private readonly Func<NetStrataOptions> _optionsFactory;
+    private readonly ISampleStorage? _storage;
 
     public OnceProbeRunner(
         ISampleCollector? collector = null,
-        Func<NetStrataOptions>? optionsFactory = null)
+        Func<NetStrataOptions>? optionsFactory = null,
+        ISampleStorage? storage = null)
     {
         _collector = collector ?? new SampleCollectorAdapter(new SampleCollector());
         _optionsFactory = optionsFactory ?? NetStrataOptions.FromEnvironment;
+        _storage = storage;
     }
 
     public async Task<OnceProbeResult> RunAsync(CancellationToken ct = default)
@@ -70,6 +74,18 @@ public sealed class OnceProbeRunner : IOnceProbeRunner
                 TlsStackTargets = options.TlsStackTargets,
                 HttpsExtra = options.HttpsExtra
             }, linked.Token);
+
+            sample = sample with { Trigger = "manual" };
+
+            var storage = _storage ?? new JsonSampleStorage(options.DataDir);
+            try
+            {
+                await storage.AppendAsync(sample, linked.Token);
+            }
+            catch
+            {
+                // ponytail: still return probe result if disk write fails
+            }
 
             var json = JsonSerializer.Serialize(sample, JsonOptions);
             return new OnceProbeResult(

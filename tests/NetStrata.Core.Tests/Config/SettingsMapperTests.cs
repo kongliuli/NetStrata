@@ -17,7 +17,7 @@ public sealed class SettingsMapperTests
         };
 
         var form = SettingsMapper.ToForm(config);
-        var back = SettingsMapper.FromForm(form);
+        var back = SettingsMapper.FromForm(form, config);
 
         Assert.Equal(45_000, back.IntervalMs);
         Assert.Equal(9000, back.Port);

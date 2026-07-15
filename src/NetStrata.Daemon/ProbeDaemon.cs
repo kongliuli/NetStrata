@@ -41,6 +41,7 @@ public sealed class ProbeDaemon : BackgroundService
             try
             {
                 var withDownload = _options.DownloadEvery > 0 && _cycle % _options.DownloadEvery == 0;
+                var budgetMs = Math.Min((int)(_options.IntervalMs * 0.8), 45_000);
                 var sample = await _collector.CollectAsync(new CollectOptions
                 {
                     PingExtra = _options.PingExtra,
@@ -48,8 +49,11 @@ public sealed class ProbeDaemon : BackgroundService
                     ProxyOverride = _options.ProxyOverride,
                     WithDownload = withDownload,
                     TlsStackTargets = _options.TlsStackTargets,
-                    HttpsExtra = _options.HttpsExtra
+                    HttpsExtra = _options.HttpsExtra,
+                    CycleBudget = TimeSpan.FromMilliseconds(Math.Max(5_000, budgetMs)),
+                    Judge = _options.Judge
                 }, ct);
+                sample = sample with { Trigger = "daemon" };
 
                 var history = await _storage.ReadTailAsync(3, ct);
                 var compareAlerts = RouteWatch.Compare(_previous, sample);
@@ -83,7 +87,8 @@ public sealed class ProbeDaemon : BackgroundService
                 if (_options.ConclusionEvery > 0 && _cycle % _options.ConclusionEvery == 0)
                 {
                     var window = await _storage.ReadTailAsync(60, ct);
-                    await _storage.WriteConclusionsAsync(_conclusions.GenerateMarkdown(window), ct);
+                    await _storage.WriteConclusionsAsync(
+                        _conclusions.GenerateMarkdown(window, lang: _options.Lang), ct);
                 }
 
                 Log($"cycle {_cycle} overall={sample.Verdict?.Overall} ms={sample.CycleMs:F0}");

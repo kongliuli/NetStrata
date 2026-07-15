@@ -94,6 +94,7 @@
           <hc:SideMenuItem x:Name="NavChain" Header="探测链路" Tag="chain"/>
           <hc:SideMenuItem x:Name="NavAi" Header="AI / API" Tag="ai"/>
           <hc:SideMenuItem x:Name="NavTargets" Header="自定义目标" Tag="targets"/>
+          <hc:SideMenuItem x:Name="NavTrend" Header="历史趋势" Tag="trend"/>
           <hc:SideMenuItem x:Name="NavLocal" Header="本机网络" Tag="local"/>
         </hc:SideMenu>
       </DockPanel>
@@ -498,6 +499,51 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
+        </StackPanel>
+      </ScrollViewer>
+
+      <!-- Trend -->
+      <ScrollViewer x:Name="PageTrend" Visibility="Collapsed"
+                    VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel>
+          <DockPanel Margin="0,0,0,12">
+            <TextBlock x:Name="TrendTitle" Style="{StaticResource NsPageTitle}" DockPanel.Dock="Left"
+                       VerticalAlignment="Center" Margin="0"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+              <RadioButton x:Name="Trend1h" Content="1h" GroupName="TrendWindow" Margin="0,0,8,0"
+                           IsChecked="True" Checked="TrendWindow_Changed"/>
+              <RadioButton x:Name="Trend6h" Content="6h" GroupName="TrendWindow" Margin="0,0,8,0"
+                           Checked="TrendWindow_Changed"/>
+              <RadioButton x:Name="Trend24h" Content="24h" GroupName="TrendWindow"
+                           Checked="TrendWindow_Changed"/>
+            </StackPanel>
+          </DockPanel>
+          <hc:Card Margin="0,0,0,12" BorderThickness="1" Padding="12">
+            <StackPanel>
+              <TextBlock x:Name="TrendPingTitle" Text="Ping 延迟 (ms)" FontWeight="SemiBold" Margin="0,0,0,8"/>
+              <ContentControl x:Name="TrendPingHost" Height="220"/>
+            </StackPanel>
+          </hc:Card>
+          <hc:Card BorderThickness="1" Padding="12">
+            <StackPanel>
+              <TextBlock x:Name="TrendLayerHint" Text="分层状态时间线"
+                         FontWeight="SemiBold" Margin="0,0,0,8"/>
+              <!-- ponytail: discrete ok/degraded/fail → heat strip, not line chart -->
+              <StackPanel x:Name="TrendLayerStrips"/>
+              <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <Border Width="12" Height="12" Margin="0,0,4,0" Background="#34A853" CornerRadius="2"/>
+                <TextBlock x:Name="TrendLegendOk" Text="正常" Margin="0,0,12,0" VerticalAlignment="Center" FontSize="11"/>
+                <Border Width="12" Height="12" Margin="0,0,4,0" Background="#FBBC04" CornerRadius="2"/>
+                <TextBlock x:Name="TrendLegendDegraded" Text="降级" Margin="0,0,12,0" VerticalAlignment="Center" FontSize="11"/>
+                <Border Width="12" Height="12" Margin="0,0,4,0" Background="#EA4335" CornerRadius="2"/>
+                <TextBlock x:Name="TrendLegendFail" Text="失败" Margin="0,0,12,0" VerticalAlignment="Center" FontSize="11"/>
+                <Border Width="12" Height="12" Margin="0,0,4,0" Background="#9AA0A6" CornerRadius="2"/>
+                <TextBlock x:Name="TrendLegendSkip" Text="跳过/未知" VerticalAlignment="Center" FontSize="11"/>
+              </StackPanel>
+            </StackPanel>
+          </hc:Card>
+          <TextBlock x:Name="TrendEmpty" Margin="0,12,0,0" Style="{StaticResource NsMuted}"
+                     TextWrapping="Wrap" Visibility="Collapsed"/>
         </StackPanel>
       </ScrollViewer>
 

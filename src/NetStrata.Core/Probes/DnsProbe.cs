@@ -14,11 +14,8 @@ public sealed class DnsProbe : IProbe<IReadOnlyList<DnsResult>>
 
     public async Task<IReadOnlyList<DnsResult>> ProbeAsync(CancellationToken ct)
     {
-        var results = new List<DnsResult>();
-        foreach (var server in Servers)
-        foreach (var domain in Domains)
-            results.Add(await QueryAsync(server, domain, ct));
-        return results;
+        var tasks = Servers.SelectMany(server => Domains.Select(domain => QueryAsync(server, domain, ct)));
+        return await Task.WhenAll(tasks);
     }
 
     private static async Task<DnsResult> QueryAsync(string server, string domain, CancellationToken ct)

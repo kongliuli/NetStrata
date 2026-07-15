@@ -1,3 +1,4 @@
+using NetStrata.Core.Config;
 using NetStrata.Core.Models;
 using NetStrata.Core.Probes;
 
@@ -5,9 +6,17 @@ namespace NetStrata.Core.Judge;
 
 public sealed class VerdictEngine
 {
-    private static readonly HashSet<string> DomesticDirectLabels = new(
-        new[] { "baidu_direct", "taobao_direct" }.Concat(AiApiCatalog.Providers.Select(p => $"{p.Id}_direct")),
-        StringComparer.OrdinalIgnoreCase);
+    private readonly JudgeOptions _opts;
+    private readonly HashSet<string> _domesticDirectLabels;
+
+    public VerdictEngine(JudgeOptions? options = null)
+    {
+        _opts = options ?? JudgeOptions.Default;
+        _domesticDirectLabels = new HashSet<string>(
+            new[] { _opts.DomesticHttpsLabel, "taobao_direct" }
+                .Concat(AiApiCatalog.Providers.Select(p => $"{p.Id}_direct")),
+            StringComparer.OrdinalIgnoreCase);
+    }
 
     public Verdict Judge(Sample sample)
     {
@@ -45,19 +54,19 @@ public sealed class VerdictEngine
         {
             if (w.Rssi is not null)
             {
-                if (w.Rssi <= -80)
+                if (w.Rssi <= _opts.WifiRssiFailDbm)
                 {
                     wifiState = LayerState.Fail;
                     wifiReasons.Add($"weak signal {w.Rssi}dBm");
                 }
-                else if (w.Rssi <= -70)
+                else if (w.Rssi <= _opts.WifiRssiDegradedDbm)
                 {
                     wifiState = LayerState.Degraded;
                     wifiReasons.Add($"marginal signal {w.Rssi}dBm");
                 }
             }
 
-            if (w.TxRate is not null && w.TxRate < 50)
+            if (w.TxRate is not null && w.TxRate < _opts.WifiTxRateDegradedMbps)
             {
                 wifiState = Worse(wifiState, LayerState.Degraded);
                 wifiReasons.Add($"low tx rate {w.TxRate}Mbps");
@@ -101,7 +110,7 @@ public sealed class VerdictEngine
             lanState = LayerState.Fail;
             lanReasons.Add($"gw ping loss={gwPing.LossPct}%");
         }
-        else if ((gwPing.AvgMs ?? 0) > 30)
+        else if ((gwPing.AvgMs ?? 0) > _opts.LanGatewayDegradedMs)
         {
             lanState = LayerState.Degraded;
             lanReasons.Add($"gw rtt {gwPing.AvgMs:F1}ms");
@@ -130,10 +139,10 @@ public sealed class VerdictEngine
         }
         else
         {
-            var aliPing = sample.Pings.FirstOrDefault(p => p.Target == "223.5.5.5");
-            var baiduHttps = sample.Https.FirstOrDefault(h => h.Label == "baidu_direct");
+            var aliPing = sample.Pings.FirstOrDefault(p => p.Target == _opts.DomesticPingTarget);
+            var baiduHttps = sample.Https.FirstOrDefault(h => h.Label == _opts.DomesticHttpsLabel);
             var baiduDns = sample.Dns.FirstOrDefault(d =>
-                d.Domain == "baidu.com" && d.Server == "223.5.5.5");
+                d.Domain == _opts.DomesticDnsDomain && d.Server == _opts.DomesticDnsServer);
 
             if (aliPing is null || !aliPing.Ok)
             {
@@ -141,39 +150,38 @@ public sealed class VerdictEngine
                 if (baiduHttps is { Ok: true })
                 {
                     bbState = Worse(bbState, LayerState.Degraded);
-                    bbReasons.Add("ping 223.5.5.5 fail (likely firewall), https ok");
+                    bbReasons.Add($"ping {_opts.DomesticPingTarget} fail (likely firewall), https ok");
                 }
                 else
                 {
                     bbState = LayerState.Fail;
-                    bbReasons.Add("ping 223.5.5.5 fail");
+                    bbReasons.Add($"ping {_opts.DomesticPingTarget} fail");
                 }
             }
 
             if (baiduDns is not null && !baiduDns.Ok)
             {
-                // ponytail: ping/https ok but dig fail → DNS path blocked, not broadband outage
                 if (aliPing is { Ok: true } && baiduHttps is { Ok: true })
                 {
                     bbState = Worse(bbState, LayerState.Degraded);
-                    bbReasons.Add("dns_udp_blocked: dig 223.5.5.5 fail but ping/https ok");
+                    bbReasons.Add($"dns_udp_blocked: dig {_opts.DomesticDnsServer} fail but ping/https ok");
                 }
                 else
                 {
                     bbState = Worse(bbState, LayerState.Fail);
-                    bbReasons.Add("dig baidu via 223.5.5.5 fail");
+                    bbReasons.Add($"dig {_opts.DomesticDnsDomain} via {_opts.DomesticDnsServer} fail");
                 }
             }
 
             if (baiduHttps is not null && !baiduHttps.Ok)
             {
                 bbState = Worse(bbState, LayerState.Fail);
-                bbReasons.Add($"baidu https fail: {baiduHttps.Err}");
+                bbReasons.Add($"{_opts.DomesticHttpsLabel} https fail: {baiduHttps.Err}");
             }
-            else if (baiduHttps is not null && baiduHttps.TotalMs > 1500)
+            else if (baiduHttps is not null && baiduHttps.TotalMs > _opts.BroadbandHttpsDegradedMs)
             {
                 bbState = Worse(bbState, LayerState.Degraded);
-                bbReasons.Add($"baidu slow {baiduHttps.TotalMs:F0}ms");
+                bbReasons.Add($"{_opts.DomesticHttpsLabel} slow {baiduHttps.TotalMs:F0}ms");
             }
         }
 
@@ -196,7 +204,7 @@ public sealed class VerdictEngine
         else
         {
             var probes = sample.Https
-                .Where(h => h.Via == "direct" && !DomesticDirectLabels.Contains(h.Label))
+                .Where(h => h.Via == "direct" && !_domesticDirectLabels.Contains(h.Label))
                 .ToList();
             var okCount = probes.Count(h => h.Ok);
 
@@ -307,9 +315,9 @@ public sealed class VerdictEngine
             metrics[$"{p.Id}DirectOk"] = dOk;
             metrics[$"{p.Id}ProxyOk"] = pOk;
             if (!dOk && d?.Err is { } derr)
-                aiReasons.Add($"{p.DisplayName} 直连: {derr}");
+                aiReasons.Add($"{p.DisplayName} direct: {derr}");
             if (!pOk && pr?.Err is { } perr)
-                aiReasons.Add($"{p.DisplayName} 代理: {perr}");
+                aiReasons.Add($"{p.DisplayName} proxy: {perr}");
         }
 
         var noProxy = string.IsNullOrEmpty(sample.ProxyConfig.ProxyUrl);
@@ -321,48 +329,48 @@ public sealed class VerdictEngine
             if (directHits == providerCount)
             {
                 aiState = AiState.DirectOnly;
-                aiHeadline = $"全部 {providerCount} 个 AI API 直连可达（未使用代理）";
+                aiHeadline = $"all {providerCount} AI APIs reachable direct (no proxy)";
             }
             else if (directHits > 0)
             {
                 aiState = AiState.Degraded;
-                aiHeadline = $"仅 {directHits}/{providerCount} 个 AI API 直连可达（未配置代理）";
+                aiHeadline = $"only {directHits}/{providerCount} AI APIs reachable direct (no proxy)";
             }
             else
             {
                 aiState = AiState.Fail;
-                aiHeadline = $"全部 AI API 直连不可达，且未配置代理";
+                aiHeadline = "all AI APIs unreachable direct, and no proxy configured";
             }
         }
         else if (proxyState == LayerState.Fail && directHits == 0)
         {
             aiState = AiState.Skipped;
-            aiHeadline = "代理挂了且直连也不通，无法判断";
+            aiHeadline = "proxy down and direct also fail — cannot judge AI";
         }
         else if (proxyHits == providerCount && directHits >= 1)
         {
             aiState = AiState.Ok;
-            aiHeadline = $"全部 AI API 代理可达（直连 {directHits}/{providerCount}）";
+            aiHeadline = $"all AI APIs reachable via proxy (direct {directHits}/{providerCount})";
         }
         else if (proxyHits == providerCount)
         {
             aiState = AiState.ProxyOnly;
-            aiHeadline = "全部 AI API 经代理可达，直连均被屏蔽";
+            aiHeadline = "all AI APIs reachable via proxy; direct blocked";
         }
         else if (proxyHits > 0 && proxyHits < providerCount)
         {
             aiState = AiState.Degraded;
-            aiHeadline = $"仅 {proxyHits}/{providerCount} 个 AI API 代理可达";
+            aiHeadline = $"only {proxyHits}/{providerCount} AI APIs reachable via proxy";
         }
         else if (directHits > 0)
         {
             aiState = AiState.DirectOnly;
-            aiHeadline = "代理路径失败，但仍有部分直连可达 — 代理 App 异常";
+            aiHeadline = "proxy path fail but some direct OK — proxy app issue";
         }
         else
         {
             aiState = AiState.Fail;
-            aiHeadline = "全部 AI API 不可达（代理与直连均失败）";
+            aiHeadline = "all AI APIs unreachable (proxy and direct fail)";
         }
 
         layers.Add(new LayerVerdict

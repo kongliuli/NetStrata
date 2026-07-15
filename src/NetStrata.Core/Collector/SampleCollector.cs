@@ -17,6 +17,9 @@ public sealed class CollectOptions
     public IReadOnlyList<string> HttpsExtra { get; init; } = [];
     public string? ProxyOverride { get; init; }
     public bool WithDownload { get; init; }
+    /// <summary>Whole-cycle budget; null = no extra budget beyond caller token.</summary>
+    public TimeSpan? CycleBudget { get; init; }
+    public JudgeOptions? Judge { get; init; }
 }
 
 public sealed class SampleCollector
@@ -34,18 +37,20 @@ public sealed class SampleCollector
     private readonly TailscaleProbe _tailscaleProbe = new();
     private readonly TlsStackProbe _tlsStackProbe = new();
     private readonly ISystemProxyReader _registryReader;
-    private readonly VerdictEngine _verdictEngine = new();
+    private readonly VerdictEngine _verdictEngine;
 
     public SampleCollector(
         IPingSender? pinger = null,
         ProxyDetector? proxyDetector = null,
         ProxyConfigProbe? proxyConfigProbe = null,
-        ISystemProxyReader? registryReader = null)
+        ISystemProxyReader? registryReader = null,
+        JudgeOptions? judge = null)
     {
         _pinger = pinger ?? new SystemPingSender();
         _registryReader = registryReader ?? new WindowsRegistryProxyReader();
         _proxyDetector = proxyDetector ?? new ProxyDetector(_registryReader);
         _proxyConfigProbe = proxyConfigProbe ?? new ProxyConfigProbe();
+        _verdictEngine = new VerdictEngine(judge);
     }
 
     public async Task<Sample> CollectAsync(CollectOptions? options = null, CancellationToken ct = default)
@@ -54,10 +59,21 @@ public sealed class SampleCollector
         DataDirectory.EnsureExists();
         var sw = Stopwatch.StartNew();
 
-        var iface = await _interfaceProbe.ProbeAsync(ct);
+        using var cycleCts = options.CycleBudget is { } budget
+            ? CancellationTokenSource.CreateLinkedTokenSource(ct)
+            : null;
+        if (cycleCts is not null && options.CycleBudget is { } b)
+            cycleCts.CancelAfter(b);
+        var token = cycleCts?.Token ?? ct;
+
+        var verdictEngine = options.Judge is not null
+            ? new VerdictEngine(options.Judge)
+            : _verdictEngine;
+
+        var iface = await _interfaceProbe.ProbeAsync(token);
         if (iface is not null)
             iface = iface with { RouteHints = RouteHintDetector.Detect() };
-        var wifiTask = _wifiProbe.ProbeAsync(iface, ct);
+        var wifiTask = _wifiProbe.ProbeAsync(iface, token);
         var systemProxy = _registryReader.Read();
         var proxyUrl = _proxyDetector.Detect(options.ProxyOverride);
 
@@ -78,7 +94,7 @@ public sealed class SampleCollector
                 target,
                 custom: customTargets.Contains(target),
                 label: label,
-                ct: ct));
+                ct: token));
         }
 
         var extras = options.HttpsExtra
@@ -91,10 +107,10 @@ public sealed class SampleCollector
             .Concat(extras)
             .ToArray();
 
-        var dnsTask = _dnsProbe.ProbeAsync(ct);
-        var httpsTask = _httpsProbe.ProbeTargetsAsync(httpsTargets, proxyUrl, ct);
-        var captiveTask = _captiveProbe.ProbeAsync(ct);
-        var tailscaleTask = _tailscaleProbe.ProbeAsync(ct);
+        var dnsTask = _dnsProbe.ProbeAsync(token);
+        var httpsTask = _httpsProbe.ProbeTargetsAsync(httpsTargets, proxyUrl, token);
+        var captiveTask = _captiveProbe.ProbeAsync(token);
+        var tailscaleTask = _tailscaleProbe.ProbeAsync(token);
         await Task.WhenAll(dnsTask, httpsTask, wifiTask, captiveTask, tailscaleTask);
 
         var proxyConfig = _proxyConfigProbe.Probe(proxyUrl, systemProxy);
@@ -102,15 +118,15 @@ public sealed class SampleCollector
         ProxyDownload? proxyDownload = null;
         if (proxyUrl is not null && proxyConfig.Listening)
         {
-            proxyEgress = await _proxyEgressProbe.ProbeAsync(proxyUrl, ct);
+            proxyEgress = await _proxyEgressProbe.ProbeAsync(proxyUrl, token);
             if (options.WithDownload)
-                proxyDownload = await _proxyDownloadProbe.ProbeAsync(proxyUrl, ct);
+                proxyDownload = await _proxyDownloadProbe.ProbeAsync(proxyUrl, token);
         }
 
         sw.Stop();
 
         var tlsTargets = TlsStackTargets.Resolve(options.TlsStackTargets);
-        var tlsStack = await _tlsStackProbe.ProbeAllAsync(tlsTargets, ct);
+        var tlsStack = await _tlsStackProbe.ProbeAllAsync(tlsTargets, token);
 
         var partial = new Sample
         {
@@ -129,7 +145,7 @@ public sealed class SampleCollector
             TlsStack = tlsStack
         };
 
-        var verdict = _verdictEngine.Judge(partial);
+        var verdict = verdictEngine.Judge(partial);
         var insights = tlsStack
             .Select(TlsStackEvaluator.ToInsight)
             .Where(i => i is not null)

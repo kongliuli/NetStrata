@@ -7,6 +7,10 @@ public sealed record Sample
     [JsonPropertyName("t")]
     public required string T { get; init; }
 
+    /// <summary>daemon | manual — who produced this sample.</summary>
+    [JsonPropertyName("trigger")]
+    public string Trigger { get; init; } = "daemon";
+
     [JsonPropertyName("cycleMs")]
     public double CycleMs { get; init; }
 

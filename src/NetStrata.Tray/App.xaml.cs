@@ -1,6 +1,8 @@
 using System.IO;
+using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
+using NetStrata.Core.Ui;
 using NetStrata.Tray.Cli;
 using NetStrata.Tray.Services;
 using NetStrata.Tray.Views;
@@ -9,8 +11,10 @@ namespace NetStrata.Tray;
 
 public partial class App : System.Windows.Application
 {
+    private const string SingleInstanceMutexName = @"Global\NetStrata.Tray";
     private TrayHost? _tray;
     private MainWindow? _main;
+    private Mutex? _singleInstance;
     private static bool _errorShown;
 
     protected override async void OnStartup(StartupEventArgs e)
@@ -26,6 +30,21 @@ public partial class App : System.Windows.Application
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             var code = await CommandDispatcher.RunAsync(e.Args);
             Shutdown(code);
+            return;
+        }
+
+        // ponytail: GUI only — CLI (--once/--export/…) may run alongside tray
+        _singleInstance = new Mutex(true, SingleInstanceMutexName, out var createdNew);
+        if (!createdNew)
+        {
+            _singleInstance.Dispose();
+            _singleInstance = null;
+            System.Windows.MessageBox.Show(
+                UiStrings.AlreadyRunning("zh"),
+                "NetStrata",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            Shutdown(0);
             return;
         }
 
@@ -89,6 +108,12 @@ public partial class App : System.Windows.Application
     protected override void OnExit(ExitEventArgs e)
     {
         _tray?.Dispose();
+        if (_singleInstance is not null)
+        {
+            try { _singleInstance.ReleaseMutex(); } catch { /* ignore */ }
+            _singleInstance.Dispose();
+            _singleInstance = null;
+        }
         base.OnExit(e);
     }
 }

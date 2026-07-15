@@ -75,6 +75,15 @@ public static class CommandDispatcher
             TlsStackTargets = options.TlsStackTargets,
             HttpsExtra = options.HttpsExtra
         }, cts.Token);
+        sample = sample with { Trigger = "manual" };
+        try
+        {
+            await new JsonSampleStorage(options.DataDir).AppendAsync(sample, cts.Token);
+        }
+        catch
+        {
+            // still emit JSON
+        }
 
         Console.WriteLine(JsonSerializer.Serialize(sample, JsonOptions));
         return 0;

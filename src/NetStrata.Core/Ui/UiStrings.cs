@@ -112,6 +112,21 @@ public static class UiStrings
         ["all proxy HTTPS fail"] = "代理 HTTPS 全部失败",
         ["dns_path_blocked: public DNS UDP 53 likely filtered; HTTP/proxy may still work"] =
             "DNS 路径受阻：公网 DNS UDP/53 可能被过滤；HTTP/代理仍可能可用",
+        ["all AI APIs unreachable direct, and no proxy configured"] =
+            "全部 AI API 直连不可达，且未配置代理",
+        ["proxy down and direct also fail — cannot judge AI"] =
+            "代理挂了且直连也不通，无法判断",
+        ["all AI APIs reachable via proxy; direct blocked"] =
+            "全部 AI API 经代理可达，直连均被屏蔽",
+        ["proxy path fail but some direct OK — proxy app issue"] =
+            "代理路径失败，但仍有部分直连可达 — 代理 App 异常",
+        ["all AI APIs unreachable (proxy and direct fail)"] =
+            "全部 AI API 不可达（代理与直连均失败）",
+        ["network mostly healthy"] = "网络状态整体正常。",
+        ["frequent degradation in last 20 cycles"] = "过去 20 轮中网络多次降级",
+        ["overseas direct blocked, proxy ok (expected)"] = "国际直连被屏蔽，代理工作正常（预期）",
+        ["TLS/SNI block detected"] = "检测到 TLS/SNI 层阻断",
+        ["proxy flapping — egress IP changing often"] = "代理不稳定，出口 IP 频繁切换",
     };
 
     private static readonly (Regex Re, Func<Match, string> Fmt)[] Patterns =
@@ -134,8 +149,20 @@ public static class UiStrings
             m => $"网关往返时延 {m.Groups[1].Value}"),
         (new Regex(@"^baidu https fail: (.*)$", RegexOptions.Compiled),
             m => $"百度 HTTPS 失败：{m.Groups[1].Value}"),
+        (new Regex(@"^baidu_direct https fail: (.*)$", RegexOptions.Compiled),
+            m => $"百度 HTTPS 失败：{m.Groups[1].Value}"),
         (new Regex(@"^baidu slow (.+)$", RegexOptions.Compiled),
             m => $"百度访问偏慢 {m.Groups[1].Value}"),
+        (new Regex(@"^baidu_direct slow (.+)$", RegexOptions.Compiled),
+            m => $"百度访问偏慢 {m.Groups[1].Value}"),
+        (new Regex(@"^ping (.+) fail \(likely firewall\), https ok$", RegexOptions.Compiled),
+            m => $"Ping {m.Groups[1].Value} 失败（多半是防火墙），HTTPS 正常"),
+        (new Regex(@"^ping (.+) fail$", RegexOptions.Compiled),
+            m => $"Ping {m.Groups[1].Value} 失败"),
+        (new Regex(@"^dns_udp_blocked: dig (.+) fail but ping/https ok$", RegexOptions.Compiled),
+            m => $"DNS UDP 被拦：dig {m.Groups[1].Value} 失败，但 Ping/HTTPS 正常"),
+        (new Regex(@"^dig (.+) via (.+) fail$", RegexOptions.Compiled),
+            m => $"经 {m.Groups[2].Value} 解析 {m.Groups[1].Value} 失败"),
         (new Regex(@"^(\d+)/(\d+) direct overseas ok$", RegexOptions.Compiled),
             m => $"国际直连 {m.Groups[1].Value}/{m.Groups[2].Value} 可达"),
         (new Regex(@"^proxy port (.+) not listening$", RegexOptions.Compiled),
@@ -146,10 +173,24 @@ public static class UiStrings
             m => $"出口 IP 获取失败：{m.Groups[1].Value}"),
         (new Regex(@"^system HTTP proxy port (.+) ≠ active (.+)$", RegexOptions.Compiled),
             m => $"系统 HTTP 代理端口 {m.Groups[1].Value} ≠ 当前代理 {m.Groups[2].Value}"),
-        (new Regex(@"^(.+) 直连: (.*)$", RegexOptions.Compiled),
+        (new Regex(@"^(.+) direct: (.*)$", RegexOptions.Compiled),
             m => $"{m.Groups[1].Value} 直连：{m.Groups[2].Value}"),
-        (new Regex(@"^(.+) 代理: (.*)$", RegexOptions.Compiled),
+        (new Regex(@"^(.+) proxy: (.*)$", RegexOptions.Compiled),
             m => $"{m.Groups[1].Value} 代理：{m.Groups[2].Value}"),
+        (new Regex(@"^all (\d+) AI APIs reachable direct \(no proxy\)$", RegexOptions.Compiled),
+            m => $"全部 {m.Groups[1].Value} 个 AI API 直连可达（未使用代理）"),
+        (new Regex(@"^only (\d+)/(\d+) AI APIs reachable direct \(no proxy\)$", RegexOptions.Compiled),
+            m => $"仅 {m.Groups[1].Value}/{m.Groups[2].Value} 个 AI API 直连可达（未配置代理）"),
+        (new Regex(@"^all AI APIs reachable via proxy \(direct (\d+)/(\d+)\)$", RegexOptions.Compiled),
+            m => $"全部 AI API 代理可达（直连 {m.Groups[1].Value}/{m.Groups[2].Value}）"),
+        (new Regex(@"^only (\d+)/(\d+) AI APIs reachable via proxy$", RegexOptions.Compiled),
+            m => $"仅 {m.Groups[1].Value}/{m.Groups[2].Value} 个 AI API 代理可达"),
+        (new Regex(@"^Wi-Fi fail in (\d+) recent cycles$", RegexOptions.Compiled),
+            m => $"近 {m.Groups[1].Value} 轮出现 Wi‑Fi 失败"),
+        (new Regex(@"^AI fail in (\d+) recent cycles$", RegexOptions.Compiled),
+            m => $"近 {m.Groups[1].Value} 轮 AI API 失败"),
+        (new Regex(@"^custom target (.+) \((.+)\) unreachable$", RegexOptions.Compiled),
+            m => $"自定义目标 {m.Groups[1].Value} ({m.Groups[2].Value}) 不可达"),
     ];
 
     private static string LinkTypeZh(string t) => t switch
@@ -173,6 +214,16 @@ public static class UiStrings
     public static string SectionAi(string lang) => T(lang, "AI / 开发者 API", "AI / Dev APIs");
     public static string SectionPing(string lang) => T(lang, "自定义目标", "Custom targets");
     public static string SectionLocal(string lang) => T(lang, "本机网络", "Local network");
+    public static string SectionTrend(string lang) => T(lang, "历史趋势", "History");
+    public static string TrayWaiting(string lang) => T(lang, "等待数据…", "Waiting…");
+    public static string TrayStartDaemon(string lang) => T(lang, "启动 Daemon", "Start Daemon");
+    public static string TrayStopDaemon(string lang) => T(lang, "停止 Daemon", "Stop Daemon");
+    public static string TrayProbeNow(string lang) => T(lang, "立即探测", "Probe now");
+    public static string TrayOpenMain(string lang) => T(lang, "打开主窗口", "Open main window");
+    public static string TraySettings(string lang) => T(lang, "设置…", "Settings…");
+    public static string TrayCopyHeadline(string lang) => T(lang, "复制 headline", "Copy headline");
+    public static string TrayExit(string lang) => T(lang, "退出", "Exit");
+    public static string AlreadyRunning(string lang) => T(lang, "NetStrata 已在运行。", "NetStrata is already running.");
     public static string OpenSiteHint(string lang) =>
         T(lang, "单击或右键 → 打开官网（探测走 API 端点，浏览器打开产品站）",
             "Click / right-click → open official site (probe uses API host; browser opens product site)");

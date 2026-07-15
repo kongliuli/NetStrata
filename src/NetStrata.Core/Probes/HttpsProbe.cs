@@ -45,10 +45,9 @@ public sealed class HttpsProbe : IProbe<IReadOnlyList<HttpsResult>>
         string? proxyUrl,
         CancellationToken ct)
     {
-        var results = new List<HttpsResult>();
-        foreach (var target in targets)
-            results.Add(await ProbeOneAsync(target, proxyUrl, ct));
-        return results;
+        var list = targets.ToArray();
+        var tasks = list.Select(t => ProbeOneAsync(t, proxyUrl, ct));
+        return await Task.WhenAll(tasks);
     }
 
     private async Task<HttpsResult> ProbeOneAsync(HttpTarget target, string? proxyUrl, CancellationToken ct)

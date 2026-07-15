@@ -7,6 +7,10 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using HandyControl.Controls;
 using HandyControl.Data;
+using LiveChartsCore;
+using LiveChartsCore.SkiaSharpView;
+using LiveChartsCore.SkiaSharpView.Painting;
+using LiveChartsCore.SkiaSharpView.WPF;
 using NetStrata.Core.Cli;
 using NetStrata.Core.Config;
 using NetStrata.Core.Flow;
@@ -15,6 +19,7 @@ using NetStrata.Core.Storage;
 using NetStrata.Core.Tui;
 using NetStrata.Core.Ui;
 using NetStrata.Tray.Services;
+using SkiaSharp;
 using HcWindow = HandyControl.Controls.Window;
 
 namespace NetStrata.Tray.Views;
@@ -50,6 +55,9 @@ public partial class MainWindow : HcWindow
 
     private int _density = 3; // 1=name+status, 2=+summary, 3=+latency
     private bool _sectionStateLoaded;
+    private CartesianChart? _trendPingChart;
+    private LineSeries<double?>[]? _trendPingSeries;
+    private string? _trendDataFingerprint;
 
     private void Window_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateAdaptiveLayout();
 
@@ -115,7 +123,10 @@ public partial class MainWindow : HcWindow
         PageChain.Visibility = tag == "chain" ? Visibility.Visible : Visibility.Collapsed;
         PageAi.Visibility = tag == "ai" ? Visibility.Visible : Visibility.Collapsed;
         PageTargets.Visibility = tag == "targets" ? Visibility.Visible : Visibility.Collapsed;
+        PageTrend.Visibility = tag == "trend" ? Visibility.Visible : Visibility.Collapsed;
         PageLocal.Visibility = tag == "local" ? Visibility.Visible : Visibility.Collapsed;
+        if (tag == "trend")
+            _ = RefreshTrendAsync();
     }
 
     private void ApplyDensityToCards()
@@ -204,12 +215,208 @@ public partial class MainWindow : HcWindow
             ApplyAi(overview, lang);
             ApplyLocal(local);
             ApplyTargets(overview, lang);
+            if (PageTrend.Visibility == Visibility.Visible)
+                await RefreshTrendAsync(lang);
         }
         catch (Exception ex)
         {
             OverviewHeadline.Text = "Error: " + ex.Message;
         }
     }
+
+    private TimeSpan TrendWindowSpan() =>
+        Trend6h.IsChecked == true ? TimeSpan.FromHours(6)
+        : Trend24h.IsChecked == true ? TimeSpan.FromHours(24)
+        : TimeSpan.FromHours(1);
+
+    private void TrendWindow_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!IsLoaded)
+            return;
+        _ = RefreshTrendAsync();
+    }
+
+    private async Task RefreshTrendAsync(string? lang = null)
+    {
+        lang ??= NetStrataOptions.FromEnvironment().Lang;
+        TrendTitle.Text = UiStrings.SectionTrend(lang);
+        TrendPingTitle.Text = UiStrings.T(lang, "Ping 延迟 (ms)", "Ping latency (ms)");
+        TrendLayerHint.Text = UiStrings.T(lang, "分层状态时间线", "Layer status timeline");
+        TrendLegendOk.Text = UiStrings.StateName(lang, "ok");
+        TrendLegendDegraded.Text = UiStrings.StateName(lang, "degraded");
+        TrendLegendFail.Text = UiStrings.StateName(lang, "fail");
+        TrendLegendSkip.Text = UiStrings.T(lang, "跳过/未知", "Skipped / unknown");
+
+        var window = TrendWindowSpan();
+        var limit = TrendWindow.SuggestedTailLimit(window);
+        var samples = await _storage.ReadTailAsync(limit, CancellationToken.None);
+        var filtered = TrendWindow.Filter(samples, window);
+        if (filtered.Count == 0)
+        {
+            TrendEmpty.Visibility = Visibility.Visible;
+            TrendEmpty.Text = UiStrings.T(lang, "尚无足够样本。启动 Daemon 或点「立即探测」后稍等。",
+                "Not enough samples yet. Start the daemon or probe once.");
+            ClearTrendVisuals();
+            return;
+        }
+
+        TrendEmpty.Visibility = Visibility.Collapsed;
+        var chart = TrendChartBuilder.Build(filtered);
+        // ponytail: skip redraw when sample set unchanged (5s timer / re-enter page)
+        var fp = $"{filtered.Count}|{filtered[^1].T}|{window.TotalHours}|{lang}|{IsDarkTheme()}";
+        if (fp == _trendDataFingerprint && _trendPingChart is not null)
+            return;
+        _trendDataFingerprint = fp;
+
+        var dark = IsDarkTheme();
+        ApplyPingChart(chart, dark, lang);
+        ApplyLayerStrips(chart, lang);
+    }
+
+    private void ClearTrendVisuals()
+    {
+        _trendDataFingerprint = null;
+        _trendPingChart = null;
+        _trendPingSeries = null;
+        TrendPingHost.Content = null;
+        TrendLayerStrips.Children.Clear();
+    }
+
+    private void ApplyPingChart(TrendChartModel chart, bool dark, string lang)
+    {
+        var labels = chart.Labels
+            .Select(t => DateTime.TryParse(t, out var dt) ? dt.ToLocalTime().ToString("HH:mm") : t)
+            .ToArray();
+        var paint = new SolidColorPaint(dark ? SKColors.LightGray : SKColors.DimGray);
+        var series = new[]
+        {
+            MakeLine(UiStrings.T(lang, "网关", "Gateway"), chart.GatewayMs,
+                dark ? SKColors.SkyBlue : SKColors.DodgerBlue),
+            MakeLine(UiStrings.T(lang, "国内", "Domestic"), chart.DomesticMs,
+                dark ? SKColors.LightGreen : SKColors.ForestGreen),
+            MakeLine(UiStrings.T(lang, "海外", "Overseas"), chart.OverseasMs,
+                dark ? SKColors.Orange : SKColors.DarkOrange)
+        };
+
+        if (_trendPingChart is null || _trendPingSeries is null)
+        {
+            _trendPingSeries = series;
+            _trendPingChart = new CartesianChart
+            {
+                LegendPosition = LiveChartsCore.Measure.LegendPosition.Bottom,
+                TooltipPosition = LiveChartsCore.Measure.TooltipPosition.Top,
+                Series = series,
+                XAxes =
+                [
+                    new Axis
+                    {
+                        Labels = labels,
+                        LabelsRotation = 15,
+                        TextSize = 11,
+                        LabelsPaint = paint
+                    }
+                ],
+                YAxes =
+                [
+                    new Axis
+                    {
+                        Name = "ms",
+                        TextSize = 11,
+                        LabelsPaint = paint
+                    }
+                ]
+            };
+            TrendPingHost.Content = _trendPingChart;
+            return;
+        }
+
+        // in-place update — avoid tearing down the chart every refresh
+        for (var i = 0; i < series.Length; i++)
+        {
+            _trendPingSeries[i].Name = series[i].Name;
+            _trendPingSeries[i].Values = series[i].Values;
+            _trendPingSeries[i].Stroke = series[i].Stroke;
+        }
+
+        if (_trendPingChart.XAxes.FirstOrDefault() is Axis x)
+        {
+            x.Labels = labels;
+            x.LabelsPaint = paint;
+        }
+
+        if (_trendPingChart.YAxes.FirstOrDefault() is Axis y)
+            y.LabelsPaint = paint;
+    }
+
+    private void ApplyLayerStrips(TrendChartModel chart, string lang)
+    {
+        TrendLayerStrips.Children.Clear();
+        var order = new[] { "wifi", "lan", "broadband", "overseas_direct", "proxy" };
+        foreach (var name in order)
+        {
+            if (!chart.LayerStates.TryGetValue(name, out var states) || states.Count == 0)
+                continue;
+
+            var row = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
+            var label = new TextBlock
+            {
+                Text = UiStrings.LayerName(lang, name),
+                Width = 72,
+                VerticalAlignment = VerticalAlignment.Center,
+                FontSize = 12
+            };
+            DockPanel.SetDock(label, Dock.Left);
+            row.Children.Add(label);
+
+            var strip = new Grid { Height = 18 };
+            var n = states.Count;
+            for (var i = 0; i < n; i++)
+                strip.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            for (var i = 0; i < n; i++)
+            {
+                var cell = new Border
+                {
+                    Background = StateBrush(states[i]),
+                    Margin = new Thickness(i == 0 ? 0 : 0.5, 0, 0, 0),
+                    CornerRadius = new CornerRadius(1),
+                    ToolTip = $"{UiStrings.LayerName(lang, name)} · {StateLabel(lang, states[i])}"
+                };
+                Grid.SetColumn(cell, i);
+                strip.Children.Add(cell);
+            }
+
+            row.Children.Add(strip);
+            TrendLayerStrips.Children.Add(row);
+        }
+    }
+
+    private static LineSeries<double?> MakeLine(string name, IReadOnlyList<double?> values, SKColor color) =>
+        new()
+        {
+            Name = name,
+            Values = values.ToArray(),
+            GeometrySize = 0,
+            Fill = null,
+            Stroke = new SolidColorPaint(color, 2),
+            LineSmoothness = 0.2
+        };
+
+    private static System.Windows.Media.Brush StateBrush(string? state) => state switch
+    {
+        "ok" => new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x34, 0xA8, 0x53)),
+        "degraded" => new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFB, 0xBC, 0x04)),
+        "fail" => new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xEA, 0x43, 0x35)),
+        _ => new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x9A, 0xA0, 0xA6))
+    };
+
+    private static string StateLabel(string lang, string? state) => state switch
+    {
+        "ok" or "degraded" or "fail" => UiStrings.StateName(lang, state),
+        "skipped" => UiStrings.T(lang, "跳过", "Skipped"),
+        "unknown" => UiStrings.T(lang, "未知", "Unknown"),
+        _ => UiStrings.T(lang, "无数据", "n/a")
+    };
 
     private void ApplyOverview(DashboardViewModel vm, LocalNetViewModel local, string lang)
     {
@@ -226,6 +433,7 @@ public partial class MainWindow : HcWindow
         NavChain.Header = UiStrings.T(lang, "探测链路", "Probe chain");
         NavAi.Header = UiStrings.T(lang, "AI / API", "AI / API");
         NavTargets.Header = UiStrings.T(lang, "自定义目标", "Targets");
+        NavTrend.Header = UiStrings.SectionTrend(lang);
         NavLocal.Header = UiStrings.SectionLocal(lang);
         RefreshButton.Content = vm.RefreshLabel;
         ProbeButton.Content = UiStrings.T(lang, "立即探测", "Probe now");

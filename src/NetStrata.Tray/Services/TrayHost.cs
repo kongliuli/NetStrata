@@ -4,6 +4,7 @@ using NetStrata.Core.Collector;
 using NetStrata.Core.Config;
 using NetStrata.Core.Storage;
 using NetStrata.Core.Tui;
+using NetStrata.Core.Ui;
 using NetStrata.Daemon;
 using NetStrata.Tray.Views;
 
@@ -20,30 +21,40 @@ internal sealed class TrayHost : IDisposable
     private readonly ToolStripMenuItem _statusItem;
     private readonly ToolStripMenuItem _daemonItem;
     private readonly ToolStripMenuItem _probeItem;
+    private readonly ToolStripMenuItem _openMainItem;
+    private readonly ToolStripMenuItem _settingsItem;
+    private readonly ToolStripMenuItem _copyItem;
+    private readonly ToolStripMenuItem _exitItem;
     private MainWindow? _main;
     private Views.SettingsWindow? _settings;
     private readonly AlertWatchState _alerts = new();
     private bool _probing;
+    private string _lang = "zh";
 
     public TrayHost(IOnceProbeRunner? probeRunner = null, InProcessDaemonController? daemon = null)
     {
         _probeRunner = probeRunner ?? new OnceProbeRunner();
         _daemon = daemon ?? CreateDefaultDaemon();
+        _lang = LangResolver.Resolve(NetStrataOptions.FromEnvironment().Lang);
         _menu = new ContextMenuStrip();
 
-        _statusItem = new ToolStripMenuItem("等待数据…") { Enabled = false };
+        _statusItem = new ToolStripMenuItem(UiStrings.TrayWaiting(_lang)) { Enabled = false };
         _menu.Items.Add(_statusItem);
         _menu.Items.Add(new ToolStripSeparator());
 
-        _daemonItem = new ToolStripMenuItem("启动 Daemon", null, (_, _) => _ = ToggleDaemonAsync());
+        _daemonItem = new ToolStripMenuItem(UiStrings.TrayStartDaemon(_lang), null, (_, _) => _ = ToggleDaemonAsync());
         _menu.Items.Add(_daemonItem);
-        _probeItem = new ToolStripMenuItem("立即探测", null, (_, _) => _ = RunOnceAsync());
+        _probeItem = new ToolStripMenuItem(UiStrings.TrayProbeNow(_lang), null, (_, _) => _ = RunOnceAsync());
         _menu.Items.Add(_probeItem);
-        _menu.Items.Add("打开主窗口", null, (_, _) => ShowMain());
-        _menu.Items.Add("设置…", null, (_, _) => OpenSettings());
-        _menu.Items.Add("复制 headline", null, (_, _) => CopyHeadline());
+        _openMainItem = new ToolStripMenuItem(UiStrings.TrayOpenMain(_lang), null, (_, _) => ShowMain());
+        _menu.Items.Add(_openMainItem);
+        _settingsItem = new ToolStripMenuItem(UiStrings.TraySettings(_lang), null, (_, _) => OpenSettings());
+        _menu.Items.Add(_settingsItem);
+        _copyItem = new ToolStripMenuItem(UiStrings.TrayCopyHeadline(_lang), null, (_, _) => CopyHeadline());
+        _menu.Items.Add(_copyItem);
         _menu.Items.Add(new ToolStripSeparator());
-        _menu.Items.Add("退出", null, (_, _) => Shutdown());
+        _exitItem = new ToolStripMenuItem(UiStrings.TrayExit(_lang), null, (_, _) => Shutdown());
+        _menu.Items.Add(_exitItem);
         _icon.ContextMenuStrip = _menu;
         _icon.DoubleClick += (_, _) => ShowMain();
 
@@ -122,17 +133,25 @@ internal sealed class TrayHost : IDisposable
 
     private void UpdateDaemonMenu()
     {
+        _lang = LangResolver.Resolve(NetStrataOptions.FromEnvironment().Lang);
         var ds = _daemon.GetStatus();
         if (ds.OwnedRunning)
         {
-            _daemonItem.Text = "停止 Daemon";
+            _daemonItem.Text = UiStrings.TrayStopDaemon(_lang);
             _daemonItem.Enabled = true;
         }
         else
         {
-            _daemonItem.Text = "启动 Daemon";
+            _daemonItem.Text = UiStrings.TrayStartDaemon(_lang);
             _daemonItem.Enabled = true;
         }
+
+        _openMainItem.Text = UiStrings.TrayOpenMain(_lang);
+        _settingsItem.Text = UiStrings.TraySettings(_lang);
+        _copyItem.Text = UiStrings.TrayCopyHeadline(_lang);
+        _exitItem.Text = UiStrings.TrayExit(_lang);
+        if (!_probing)
+            _probeItem.Text = UiStrings.TrayProbeNow(_lang);
     }
 
     private string BuildDaemonStatusLine() => _daemon.GetStatus().Label;
@@ -199,7 +218,7 @@ internal sealed class TrayHost : IDisposable
         {
             _probing = false;
             _probeItem.Enabled = true;
-            _probeItem.Text = "立即探测";
+            _probeItem.Text = UiStrings.TrayProbeNow(_lang);
         }
     }
 
