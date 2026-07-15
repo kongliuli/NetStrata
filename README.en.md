@@ -77,7 +77,7 @@ This is a different problem than PingPlotter (hop-by-hop paths), SmokePing (long
 
 ### Roadmap (next release focus)
 
-- **Tray-resident** — close main window hides to tray; exit only from tray menu; daemon keeps running
+- **Tray-resident** — close main window hides to tray (probing continues); exit only from tray; second launch activates existing window; Settings can enable “start minimized to tray”
 - Multi-channel alerts (Webhook / Telegram, …)
 - Optional web dashboard (`--web`)
 - Richer trend series (per-HTTPS targets, custom series)

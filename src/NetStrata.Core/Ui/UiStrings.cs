@@ -223,7 +223,8 @@ public static class UiStrings
     public static string TraySettings(string lang) => T(lang, "设置…", "Settings…");
     public static string TrayCopyHeadline(string lang) => T(lang, "复制 headline", "Copy headline");
     public static string TrayExit(string lang) => T(lang, "退出", "Exit");
-    public static string AlreadyRunning(string lang) => T(lang, "NetStrata 已在运行。", "NetStrata is already running.");
+    public static string AlreadyRunning(string lang) =>
+        T(lang, "NetStrata 已在运行；已尝试打开已有窗口。", "NetStrata is already running; tried to show the existing window.");
     public static string OpenSiteHint(string lang) =>
         T(lang, "单击或右键 → 打开官网（探测走 API 端点，浏览器打开产品站）",
             "Click / right-click → open official site (probe uses API host; browser opens product site)");

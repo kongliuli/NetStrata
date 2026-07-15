@@ -14,6 +14,7 @@ using LiveChartsCore.SkiaSharpView.WPF;
 using NetStrata.Core.Cli;
 using NetStrata.Core.Config;
 using NetStrata.Core.Flow;
+using NetStrata.Core.Models;
 using NetStrata.Core.Probes;
 using NetStrata.Core.Storage;
 using NetStrata.Core.Tui;
@@ -27,10 +28,12 @@ namespace NetStrata.Tray.Views;
 public partial class MainWindow : HcWindow
 {
     private readonly JsonSampleStorage _storage = new();
+    private readonly JsonAlertStorage _alertStorage = new();
     private readonly DispatcherTimer _timer;
     private readonly IBrowserLauncher _browser;
     private readonly Action? _probeNow;
     private readonly Func<NetStrataOptions, Task<(bool Ok, string? Error)>>? _restartDaemon;
+    private bool _forceClose;
 
     public MainWindow(
         IBrowserLauncher? browser = null,
@@ -50,7 +53,33 @@ public partial class MainWindow : HcWindow
             await RefreshAsync();
             _timer.Start();
         };
+        Closing += OnClosingToTray;
         Closed += (_, _) => _timer.Stop();
+        NetworkFlow.OpenTrendRequested += OpenTrendForTarget;
+        NetworkFlow.ProbeRequested += () => _probeNow?.Invoke();
+    }
+
+    private void OpenTrendForTarget(string targetTitle)
+    {
+        var lang = NetStrataOptions.FromEnvironment().Lang;
+        NavTrend.IsSelected = true;
+        ShowPage("trend");
+        TrendFocusBanner.Visibility = Visibility.Visible;
+        TrendFocusHint.Text = UiStrings.T(lang,
+            $"关注目标：{targetTitle}（当前趋势为网关/国内/海外汇总；分目标 HTTPS 序列后续接入）",
+            $"Focus: {targetTitle} (trend shows gateway/domestic/overseas aggregates; per-target HTTPS series TBD)");
+        _ = RefreshTrendAsync(lang);
+    }
+
+    /// <summary>Allow the next Close / app Shutdown to actually tear down the window.</summary>
+    public void AllowClose() => _forceClose = true;
+
+    private void OnClosingToTray(object? sender, CancelEventArgs e)
+    {
+        if (_forceClose)
+            return;
+        e.Cancel = true;
+        Hide();
     }
 
     private int _density = 3; // 1=name+status, 2=+summary, 3=+latency
@@ -124,9 +153,18 @@ public partial class MainWindow : HcWindow
         PageAi.Visibility = tag == "ai" ? Visibility.Visible : Visibility.Collapsed;
         PageTargets.Visibility = tag == "targets" ? Visibility.Visible : Visibility.Collapsed;
         PageTrend.Visibility = tag == "trend" ? Visibility.Visible : Visibility.Collapsed;
+        PageAlerts.Visibility = tag == "alerts" ? Visibility.Visible : Visibility.Collapsed;
         PageLocal.Visibility = tag == "local" ? Visibility.Visible : Visibility.Collapsed;
         if (tag == "trend")
             _ = RefreshTrendAsync();
+        if (tag == "alerts")
+            _ = RefreshAlertsAsync();
+    }
+
+    private void AlertsPanel_Click(object sender, MouseButtonEventArgs e)
+    {
+        NavAlerts.IsSelected = true;
+        ShowPage("alerts");
     }
 
     private void ApplyDensityToCards()
@@ -210,13 +248,15 @@ public partial class MainWindow : HcWindow
 
             var chain = ChainMapper.FromState(state, lang);
             ApplyChain(chain);
-            NetworkFlow.SetTraces(FlowTraceBuilder.FromState(state, lang));
+            NetworkFlow.SetBlocks(MultiTargetFlowBuilder.FromState(state, lang), lang);
 
             ApplyAi(overview, lang);
             ApplyLocal(local);
             ApplyTargets(overview, lang);
             if (PageTrend.Visibility == Visibility.Visible)
                 await RefreshTrendAsync(lang);
+            if (PageAlerts.Visibility == Visibility.Visible)
+                await RefreshAlertsAsync(lang, state);
         }
         catch (Exception ex)
         {
@@ -281,6 +321,116 @@ public partial class MainWindow : HcWindow
         TrendPingHost.Content = null;
         TrendLayerStrips.Children.Clear();
     }
+
+    private List<AlertRowVm> _alertRows = [];
+    private string _alertsLang = "zh";
+
+    private async Task RefreshAlertsAsync(string? lang = null, DaemonState? state = null)
+    {
+        lang ??= NetStrataOptions.FromEnvironment().Lang;
+        _alertsLang = lang;
+        AlertsTitle.Text = UiStrings.T(lang, "通知告警", "Alerts");
+        AlertsPageHint.Text = UiStrings.T(lang,
+            "这里用白话记录网络变化（代理出口、路由器、网卡等）。点击条目可展开详情。",
+            "Plain-language history of network changes (proxy exit, gateway, adapter). Expand a row for details.");
+        AlertFilterAll.Content = UiStrings.T(lang, "全部", "All");
+        AlertFilterFail.Content = UiStrings.T(lang, "重要", "Important");
+        AlertFilterWarn.Content = UiStrings.T(lang, "提醒", "Notice");
+        AlertFilterInfo.Content = UiStrings.T(lang, "提示", "Info");
+        AlertsEmptyProbeButton.Content = UiStrings.T(lang, "立即探测", "Probe now");
+
+        state ??= await _storage.ReadStateAsync(CancellationToken.None);
+        var persisted = await _alertStorage.ReadTailAsync(100, CancellationToken.None);
+        var merged = MergeAlerts(persisted, state?.RecentAlerts ?? []);
+        _alertRows = merged
+            .AsEnumerable()
+            .Reverse()
+            .Select(a =>
+            {
+                var view = AlertPresenter.Format(a, lang);
+                var (accent, badge, soft) = AlertSeverityColors(view.Severity, lang);
+                return new AlertRowVm
+                {
+                    Title = view.Title,
+                    Detail = view.Detail,
+                    When = view.WhenLocal,
+                    Badge = badge,
+                    Severity = view.Severity,
+                    AccentBrush = Brush(accent),
+                    BadgeBg = Brush(soft)
+                };
+            }).ToList();
+
+        ApplyAlertFilter();
+    }
+
+    private void AlertFilter_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!IsLoaded)
+            return;
+        ApplyAlertFilter();
+    }
+
+    private void ApplyAlertFilter()
+    {
+        var lang = _alertsLang;
+        var filter = AlertFilterFail.IsChecked == true ? "fail"
+            : AlertFilterWarn.IsChecked == true ? "warn"
+            : AlertFilterInfo.IsChecked == true ? "info"
+            : null;
+
+        var shown = filter is null
+            ? _alertRows
+            : _alertRows.Where(r => r.Severity == filter).ToList();
+
+        if (_alertRows.Count == 0)
+        {
+            AlertsEmptyPanel.Visibility = Visibility.Visible;
+            AlertsEmptyProbeButton.Visibility = Visibility.Visible;
+            AlertsEmpty.Text = UiStrings.T(lang,
+                "暂无通知。网络出口或路由器变更时会自动记录在此。可先点「立即探测」刷新状态。",
+                "No alerts yet. Changes to proxy exit or gateway will appear here. Tap Probe now to refresh.");
+            AlertsList.ItemsSource = null;
+            return;
+        }
+
+        if (shown.Count == 0)
+        {
+            AlertsEmptyPanel.Visibility = Visibility.Visible;
+            AlertsEmptyProbeButton.Visibility = Visibility.Collapsed;
+            AlertsEmpty.Text = UiStrings.T(lang,
+                "当前筛选条件下没有通知，可切换到「全部」查看。",
+                "No alerts match this filter. Switch to All to see everything.");
+            AlertsList.ItemsSource = null;
+            return;
+        }
+
+        AlertsEmptyPanel.Visibility = Visibility.Collapsed;
+        AlertsList.ItemsSource = shown;
+    }
+
+    private static IReadOnlyList<Alert> MergeAlerts(IReadOnlyList<Alert> persisted, IReadOnlyList<Alert> recent)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var list = new List<Alert>();
+        foreach (var a in persisted.Concat(recent))
+        {
+            var key = AlertNotifier.Key(a);
+            if (!seen.Add(key))
+                continue;
+            list.Add(a);
+        }
+
+        return list;
+    }
+
+    private static (string Accent, string Badge, string Soft) AlertSeverityColors(string severity, string lang) =>
+        severity switch
+        {
+            "fail" => ("#EA4335", UiStrings.T(lang, "重要", "Important"), "#FCE8E6"),
+            "warn" => ("#F9AB00", UiStrings.T(lang, "提醒", "Notice"), "#FEF7E0"),
+            _ => ("#1A73E8", UiStrings.T(lang, "提示", "Info"), "#E8F0FE")
+        };
 
     private void ApplyPingChart(TrendChartModel chart, bool dark, string lang)
     {
@@ -434,6 +584,7 @@ public partial class MainWindow : HcWindow
         NavAi.Header = UiStrings.T(lang, "AI / API", "AI / API");
         NavTargets.Header = UiStrings.T(lang, "自定义目标", "Targets");
         NavTrend.Header = UiStrings.SectionTrend(lang);
+        NavAlerts.Header = UiStrings.T(lang, "通知告警", "Alerts");
         NavLocal.Header = UiStrings.SectionLocal(lang);
         RefreshButton.Content = vm.RefreshLabel;
         ProbeButton.Content = UiStrings.T(lang, "立即探测", "Probe now");
@@ -442,13 +593,37 @@ public partial class MainWindow : HcWindow
         OverviewAiTitle.Text = vm.AiTitle;
         OverviewAiHint.Text = UiStrings.OpenSiteHint(lang);
         OverviewLocalTitle.Text = local.Title;
+        AlertsPanelTitle.Text = UiStrings.T(lang, "近期通知", "Recent alerts");
+        AlertsMoreHint.Text = UiStrings.T(lang, "查看全部 →", "See all →");
 
-        if (string.IsNullOrWhiteSpace(vm.AlertsSummary))
+        if (vm.RecentAlertViews.Count == 0)
+        {
             AlertsPanel.Visibility = Visibility.Collapsed;
+            OverviewAlertsList.ItemsSource = null;
+        }
         else
         {
             AlertsPanel.Visibility = Visibility.Visible;
-            AlertsText.Text = vm.AlertsSummary;
+            // newest first for scanning; preserve expand state by title+when key
+            var prevExpanded = new HashSet<string>(StringComparer.Ordinal);
+            if (OverviewAlertsList.ItemsSource is IEnumerable<object> oldItems)
+            {
+                foreach (var o in oldItems)
+                {
+                    if (o is OverviewAlertVm a && a.IsExpanded)
+                        prevExpanded.Add(a.Key);
+                }
+            }
+
+            OverviewAlertsList.ItemsSource = vm.RecentAlertViews
+                .Reverse()
+                .Select(v => new OverviewAlertVm
+                {
+                    Title = v.Title,
+                    Detail = v.Detail,
+                    When = v.WhenLocal,
+                    IsExpanded = prevExpanded.Contains($"{v.Title}|{v.WhenLocal}")
+                }).ToList();
         }
 
         LayersList.ItemsSource = vm.Layers.Select(l => new CardVm
@@ -479,18 +654,25 @@ public partial class MainWindow : HcWindow
 
     private void ApplyChain(ChainViewModel vm)
     {
+        var lang = NetStrataOptions.FromEnvironment().Lang;
         ChainOverall.Text = $"{vm.Overall}  ·  {vm.Headline}";
         ChainAi.Text = vm.AiHeadline;
         ChainMeta.Text = vm.Meta;
-        ChainList.ItemsSource = vm.Rows.Select(r => new ChainRowVm
-        {
-            Title = r.DisplayName,
-            Badge = r.StateLabel,
-            Reasons = r.Reasons.Count == 0 ? "—" : string.Join("\n", r.Reasons),
-            Metrics = r.MetricsSummary,
-            AccentBrush = Brush(r.BorderColor),
-            BadgeBg = SoftBrush(r.BorderColor)
-        }).ToList();
+        TrunkHint.Text = UiStrings.T(lang, "公共路径", "Shared path");
+        // W9f: only shared trunk + egress hubs — target detail lives in NetworkFlow blocks
+        var trunkKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "wifi", "lan", "broadband", "overseas_direct", "proxy" };
+        TrunkStrip.ItemsSource = vm.Rows
+            .Where(r => trunkKeys.Contains(r.LayerKey))
+            .Select(r => new ChainRowVm
+            {
+                Title = r.DisplayName,
+                Badge = r.StateLabel,
+                Reasons = "",
+                Metrics = "",
+                AccentBrush = Brush(r.BorderColor),
+                BadgeBg = SoftBrush(r.BorderColor)
+            }).ToList();
     }
 
     private void ApplyAi(DashboardViewModel vm, string lang)
@@ -687,7 +869,9 @@ public partial class MainWindow : HcWindow
             TlsStackTargets = config.TlsStackTargets,
             HttpsExtra = https,
             Lang = config.Lang,
-            Theme = config.Theme
+            Theme = config.Theme,
+            StartMinimized = config.StartMinimized,
+            Judge = config.Judge
         });
     }
 
@@ -798,5 +982,36 @@ public partial class MainWindow : HcWindow
     {
         public required string Label { get; init; }
         public required string Value { get; init; }
+    }
+
+    private sealed class AlertRowVm
+    {
+        public required string Title { get; init; }
+        public required string Detail { get; init; }
+        public required string When { get; init; }
+        public required string Badge { get; init; }
+        public required string Severity { get; init; }
+        public required System.Windows.Media.Brush AccentBrush { get; init; }
+        public required System.Windows.Media.Brush BadgeBg { get; init; }
+    }
+
+    private sealed class OverviewAlertVm : INotifyPropertyChanged
+    {
+        private bool _isExpanded;
+        public required string Title { get; init; }
+        public required string Detail { get; init; }
+        public required string When { get; init; }
+        public string Key => $"{Title}|{When}";
+        public bool IsExpanded
+        {
+            get => _isExpanded;
+            set
+            {
+                if (_isExpanded == value) return;
+                _isExpanded = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsExpanded)));
+            }
+        }
+        public event PropertyChangedEventHandler? PropertyChanged;
     }
 }

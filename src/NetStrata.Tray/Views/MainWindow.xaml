@@ -95,6 +95,7 @@
           <hc:SideMenuItem x:Name="NavAi" Header="AI / API" Tag="ai"/>
           <hc:SideMenuItem x:Name="NavTargets" Header="自定义目标" Tag="targets"/>
           <hc:SideMenuItem x:Name="NavTrend" Header="历史趋势" Tag="trend"/>
+          <hc:SideMenuItem x:Name="NavAlerts" Header="通知告警" Tag="alerts"/>
           <hc:SideMenuItem x:Name="NavLocal" Header="本机网络" Tag="local"/>
         </hc:SideMenu>
       </DockPanel>
@@ -128,9 +129,43 @@
             </Grid>
           </hc:Card>
 
-          <hc:Card x:Name="AlertsPanel" Margin="0,0,0,12" BorderThickness="1" Padding="12"
+          <hc:Card x:Name="AlertsPanel" Margin="0,0,0,12" BorderThickness="1" Padding="10,8"
                    Background="{DynamicResource WarningBrush}" Visibility="Collapsed">
-            <TextBlock x:Name="AlertsText" TextWrapping="Wrap"/>
+            <StackPanel>
+              <DockPanel Margin="2,0,2,6">
+                <TextBlock x:Name="AlertsPanelTitle" DockPanel.Dock="Left" FontWeight="SemiBold" FontSize="13"
+                           Text="近期通知" VerticalAlignment="Center"/>
+                <TextBlock x:Name="AlertsMoreHint" DockPanel.Dock="Right" Margin="12,0,0,0"
+                           VerticalAlignment="Center" FontSize="11" Opacity="0.9"
+                           Cursor="Hand" Text="查看全部 →"
+                           MouseLeftButtonUp="AlertsPanel_Click"/>
+              </DockPanel>
+              <!-- newest first, max 5; click expander header for detail -->
+              <ItemsControl x:Name="OverviewAlertsList">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel/>
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Expander Margin="0,0,0,4" BorderThickness="0" Padding="0"
+                              IsExpanded="{Binding IsExpanded, Mode=TwoWay}">
+                      <Expander.Header>
+                        <DockPanel Margin="0,2">
+                          <TextBlock DockPanel.Dock="Right" Text="{Binding When}" Margin="10,0,0,0"
+                                     FontSize="11" Opacity="0.85" VerticalAlignment="Center"/>
+                          <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold"
+                                     TextWrapping="Wrap" VerticalAlignment="Center"/>
+                        </DockPanel>
+                      </Expander.Header>
+                      <TextBlock Text="{Binding Detail}" Margin="28,2,8,6" FontSize="12"
+                                 TextWrapping="Wrap" Opacity="0.92"/>
+                    </Expander>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
           </hc:Card>
 
           <hc:Card Margin="0,0,0,12" BorderThickness="1" Padding="4,2,4,10">
@@ -331,34 +366,34 @@
               <TextBlock x:Name="ChainOverall" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/>
               <TextBlock x:Name="ChainAi" Margin="0,6,0,0" Foreground="{DynamicResource PrimaryBrush}" TextWrapping="Wrap"/>
               <TextBlock x:Name="ChainMeta" Margin="0,8,0,0" Style="{StaticResource NsMuted}" TextWrapping="Wrap"/>
+              <!-- W9f: compact shared-path strip (replaces per-layer ChainList cards) -->
+              <TextBlock x:Name="TrunkHint" Margin="0,12,0,6" FontSize="11" FontWeight="SemiBold"
+                         Text="公共路径"/>
+              <ItemsControl x:Name="TrunkStrip">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel/>
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Margin="0,0,8,6" Padding="10,6" CornerRadius="8" BorderThickness="1"
+                            BorderBrush="{Binding AccentBrush}" Background="{Binding BadgeBg}">
+                      <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding Badge}" Margin="8,0,0,0" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{Binding AccentBrush}" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
             </StackPanel>
           </hc:Card>
           <hc:Card Margin="0,0,0,12" BorderThickness="1" Padding="14">
             <controls:NetworkFlowControl x:Name="NetworkFlow"/>
           </hc:Card>
-          <ItemsControl x:Name="ChainList">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <hc:Card Margin="0,0,0,8" BorderThickness="1" Padding="0">
-                  <DockPanel>
-                    <Border DockPanel.Dock="Left" Width="5" Background="{Binding AccentBrush}"/>
-                    <StackPanel Margin="12,10">
-                      <DockPanel>
-                        <Border DockPanel.Dock="Right" Padding="7,2" CornerRadius="10"
-                                Background="{Binding BadgeBg}" BorderBrush="{Binding AccentBrush}" BorderThickness="1">
-                          <TextBlock Text="{Binding Badge}" FontSize="10" FontWeight="SemiBold"
-                                     Foreground="{Binding AccentBrush}"/>
-                        </Border>
-                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13"/>
-                      </DockPanel>
-                      <TextBlock Text="{Binding Reasons}" Margin="0,6,0,0" TextWrapping="Wrap" FontSize="12"/>
-                      <TextBlock Text="{Binding Metrics}" Margin="0,4,0,0" Style="{StaticResource NsMuted}" TextWrapping="Wrap"/>
-                    </StackPanel>
-                  </DockPanel>
-                </hc:Card>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
         </StackPanel>
       </ScrollViewer>
 
@@ -518,6 +553,12 @@
                            Checked="TrendWindow_Changed"/>
             </StackPanel>
           </DockPanel>
+          <Border x:Name="TrendFocusBanner" Margin="0,0,0,12" Padding="10,8" CornerRadius="6"
+                  Background="#331A73E8" BorderBrush="{DynamicResource PrimaryBrush}" BorderThickness="1"
+                  Visibility="Collapsed">
+            <TextBlock x:Name="TrendFocusHint" FontSize="12" TextWrapping="Wrap"
+                       Foreground="{DynamicResource PrimaryBrush}"/>
+          </Border>
           <hc:Card Margin="0,0,0,12" BorderThickness="1" Padding="12">
             <StackPanel>
               <TextBlock x:Name="TrendPingTitle" Text="Ping 延迟 (ms)" FontWeight="SemiBold" Margin="0,0,0,8"/>
@@ -544,6 +585,78 @@
           </hc:Card>
           <TextBlock x:Name="TrendEmpty" Margin="0,12,0,0" Style="{StaticResource NsMuted}"
                      TextWrapping="Wrap" Visibility="Collapsed"/>
+        </StackPanel>
+      </ScrollViewer>
+
+      <!-- Alerts (persisted history, plain-language) -->
+      <ScrollViewer x:Name="PageAlerts" Visibility="Collapsed"
+                    VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel>
+          <DockPanel Margin="0,0,0,8">
+            <TextBlock x:Name="AlertsTitle" Style="{StaticResource NsPageTitle}" DockPanel.Dock="Left"
+                       VerticalAlignment="Center" Margin="0"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+              <RadioButton x:Name="AlertFilterAll" Content="全部" GroupName="AlertSeverity"
+                           IsChecked="True" Margin="0,0,10,0" Checked="AlertFilter_Changed"/>
+              <RadioButton x:Name="AlertFilterFail" Content="重要" GroupName="AlertSeverity"
+                           Margin="0,0,10,0" Checked="AlertFilter_Changed"/>
+              <RadioButton x:Name="AlertFilterWarn" Content="提醒" GroupName="AlertSeverity"
+                           Margin="0,0,10,0" Checked="AlertFilter_Changed"/>
+              <RadioButton x:Name="AlertFilterInfo" Content="提示" GroupName="AlertSeverity"
+                           Checked="AlertFilter_Changed"/>
+            </StackPanel>
+          </DockPanel>
+          <TextBlock x:Name="AlertsPageHint" Style="{StaticResource NsMuted}" Margin="0,0,0,12"
+                     TextWrapping="Wrap"
+                     Text="这里用白话记录网络变化（代理出口、路由器、网卡等），方便非专业用户对照。"/>
+          <hc:Card x:Name="AlertsEmptyPanel" BorderThickness="1" Padding="20" Margin="0,0,0,8"
+                   Visibility="Collapsed">
+            <StackPanel HorizontalAlignment="Center">
+              <TextBlock x:Name="AlertsEmpty" Foreground="{DynamicResource SecondaryTextBrush}"
+                         TextWrapping="Wrap" TextAlignment="Center" MaxWidth="420"/>
+              <Button x:Name="AlertsEmptyProbeButton" Content="立即探测" Margin="0,14,0,0"
+                      Style="{StaticResource NsProbeButton}" MinWidth="160"
+                      HorizontalAlignment="Center"
+                      Click="Probe_Click"/>
+            </StackPanel>
+          </hc:Card>
+          <ItemsControl x:Name="AlertsList">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <hc:UniformSpacingPanel Orientation="Vertical" Spacing="8"/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Padding="14,12" CornerRadius="8" BorderThickness="1"
+                        BorderBrush="{Binding AccentBrush}"
+                        Background="{DynamicResource RegionBrush}">
+                  <Expander BorderThickness="0" IsExpanded="False">
+                    <Expander.Header>
+                      <DockPanel>
+                        <TextBlock DockPanel.Dock="Right" Text="{Binding When}" Margin="12,0,0,0"
+                                   FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}"
+                                   VerticalAlignment="Center"/>
+                        <hc:Tag DockPanel.Dock="Right" Style="{StaticResource NsStatusTag}"
+                                Content="{Binding Badge}" Margin="8,0,12,0"
+                                Background="{Binding BadgeBg}" Foreground="{Binding AccentBrush}"
+                                BorderBrush="{Binding AccentBrush}" VerticalAlignment="Center"/>
+                        <StackPanel Orientation="Horizontal">
+                          <Border Width="3" Height="16" CornerRadius="2" Margin="0,0,10,0"
+                                  Background="{Binding AccentBrush}" VerticalAlignment="Center"/>
+                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14"
+                                     TextWrapping="Wrap" VerticalAlignment="Center"/>
+                        </StackPanel>
+                      </DockPanel>
+                    </Expander.Header>
+                    <TextBlock Text="{Binding Detail}" Margin="16,6,0,2" FontSize="12"
+                               Foreground="{DynamicResource SecondaryTextBrush}"
+                               TextWrapping="Wrap"/>
+                  </Expander>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
         </StackPanel>
       </ScrollViewer>
 

@@ -64,6 +64,8 @@ public sealed class ProbeDaemon : BackgroundService
 
                 await _storage.AppendAsync(sample, ct);
                 _recentAlerts = RouteWatch.MergeRecent(_recentAlerts, cycleAlerts);
+                if (cycleAlerts.Count > 0)
+                    await new JsonAlertStorage(_options.DataDir).AppendAsync(cycleAlerts, ct);
                 _previous = sample;
 
                 var recent = await _storage.ReadTailAsync(20, ct);

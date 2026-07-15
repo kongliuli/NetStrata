@@ -111,11 +111,14 @@ internal sealed class TrayHost : IDisposable
 
             foreach (var alert in _alerts.ConsumeNew(state))
             {
-                _icon.ShowBalloonTip(
-                    8000,
-                    $"NetStrata 告警 · {alert.Type}",
-                    alert.Message,
-                    ToolTipIcon.Warning);
+                var view = AlertPresenter.Format(alert, _lang);
+                var tipIcon = view.Severity switch
+                {
+                    "fail" => ToolTipIcon.Error,
+                    "warn" => ToolTipIcon.Warning,
+                    _ => ToolTipIcon.Info
+                };
+                _icon.ShowBalloonTip(8000, view.Title, view.Detail, tipIcon);
             }
 
             UpdateDaemonMenu();
@@ -222,7 +225,8 @@ internal sealed class TrayHost : IDisposable
         }
     }
 
-    private void ShowMain()
+    /// <summary>Show / activate main window (tray menu, double-click, or second-instance signal).</summary>
+    public void ShowMain()
     {
         if (_main is null)
             return;
@@ -231,6 +235,7 @@ internal sealed class TrayHost : IDisposable
         if (_main.WindowState == System.Windows.WindowState.Minimized)
             _main.WindowState = System.Windows.WindowState.Normal;
         _main.Activate();
+        _main.Focus();
         _ = _main.RefreshAsync();
     }
 
@@ -255,7 +260,13 @@ internal sealed class TrayHost : IDisposable
         _icon.ShowBalloonTip(2000, "NetStrata", "已复制 headline", ToolTipIcon.None);
     }
 
-    private static void Shutdown() => System.Windows.Application.Current.Shutdown();
+    private void Shutdown()
+    {
+        _timer.Stop();
+        _daemon.Stop();
+        _main?.AllowClose();
+        System.Windows.Application.Current.Shutdown();
+    }
 
     public void Dispose()
     {

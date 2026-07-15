@@ -2,6 +2,10 @@ namespace NetStrata.Core.Flow;
 
 public enum FlowTraceMode
 {
+    /// <summary>Shared trunk + fan-out to many monitored targets.</summary>
+    MultiTarget,
+    /// <summary>Single linear probe path (legacy / drill-down).</summary>
+    Probe,
     Layers,
     Routes,
     Tls
@@ -37,4 +41,6 @@ public sealed record FlowTrace(
     string CapturedAt,
     IReadOnlyList<FlowNode> Nodes,
     IReadOnlyList<FlowEdge> Edges,
-    bool HasData);
+    bool HasData,
+    /// <summary>"direct" or "proxy" when the graph has a single active traffic path; null for TLS.</summary>
+    string? ActiveLane = null);

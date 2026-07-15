@@ -33,6 +33,7 @@ public partial class SettingsWindow : HcWindow
         SelectCombo(LangBox, form.Lang);
         SelectCombo(ThemeBox, form.Theme);
         StartupCheck.IsChecked = _startup.IsEnabled();
+        StartMinimizedCheck.IsChecked = form.StartMinimized;
         StatusText.Text = _configPath;
         LocalizeChrome(form.Lang);
     }
@@ -47,9 +48,12 @@ public partial class SettingsWindow : HcWindow
         IntervalLabel.Text = UiStrings.T(lang, "探测间隔 (ms)", "Interval (ms)");
         TlsLabel.Text = UiStrings.T(lang, "TLS 栈目标", "TLS stack targets");
         StartupCheck.Content = UiStrings.T(lang, "登录时启动 NetStrata", "Start NetStrata at login");
+        StartMinimizedCheck.Content = UiStrings.T(lang,
+            "启动时最小化到托盘（不弹出主窗口）",
+            "Start minimized to tray (no main window)");
         TargetsNote.Text = UiStrings.T(lang,
-            "自定义 Ping / HTTPS 目标请在「自定义目标」页添加或删除。",
-            "Add or remove custom Ping / HTTPS targets on the Targets tab.");
+            "自定义目标请在「自定义目标」页维护。关闭主窗口将继续在托盘运行；退出请用托盘菜单。",
+            "Manage custom targets on the Targets tab. Closing the main window keeps NetStrata in the tray; use the tray menu to quit.");
         CancelButton.Content = UiStrings.T(lang, "取消", "Cancel");
         SaveButton.Content = UiStrings.T(lang, "保存", "Save");
     }
@@ -84,7 +88,8 @@ public partial class SettingsWindow : HcWindow
                 PingLabels = "",
                 TlsStackTargets = TlsTargetsBox.Text,
                 Lang = SelectedTag(LangBox, "zh"),
-                Theme = SelectedTag(ThemeBox, "system")
+                Theme = SelectedTag(ThemeBox, "system"),
+                StartMinimized = StartMinimizedCheck.IsChecked == true
             }, existing);
 
             DataDirectory.EnsureExists();

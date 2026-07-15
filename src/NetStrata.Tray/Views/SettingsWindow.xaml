@@ -3,7 +3,7 @@
            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
            xmlns:hc="https://handyorg.github.io/handycontrol"
            Title="NetStrata 设置"
-           Height="520" Width="540"
+           Height="560" Width="540"
            WindowStartupLocation="CenterScreen"
            ResizeMode="NoResize"
            ShowTitle="True"
@@ -55,8 +55,11 @@
              hc:BorderElement.CornerRadius="6"
              hc:InfoElement.Placeholder="每行一个主机名"/>
 
-    <CheckBox x:Name="StartupCheck" Grid.Row="5" Grid.ColumnSpan="2" Margin="0,12,0,0"
-              Content="登录时启动 NetStrata"/>
+    <StackPanel Grid.Row="5" Grid.ColumnSpan="2" Margin="0,12,0,0">
+      <CheckBox x:Name="StartupCheck" Content="登录时启动 NetStrata"/>
+      <CheckBox x:Name="StartMinimizedCheck" Margin="0,8,0,0"
+                Content="启动时最小化到托盘（不弹出主窗口）"/>
+    </StackPanel>
 
     <hc:Card Grid.Row="6" Grid.ColumnSpan="2" Margin="0,12,0,0" BorderThickness="1" Padding="12">
       <TextBlock x:Name="TargetsNote" Foreground="{DynamicResource SecondaryTextBrush}" TextWrapping="Wrap"

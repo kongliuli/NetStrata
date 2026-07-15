@@ -77,7 +77,7 @@ flowchart TD
 
 ### Roadmap（下一版重点）
 
-- **托盘常驻**：关主窗 → 隐藏到托盘；`ShutdownMode.OnExplicitShutdown`；仅托盘「退出」才停 Daemon
+- **托盘常驻**：关主窗 → 隐藏到托盘（探测继续）；仅托盘「退出」结束；再开 exe 激活已有窗；设置可勾选「启动时最小化到托盘」
 - 多通道告警（Webhook / Telegram 等）
 - 复活可选 Web 仪表盘（`--web`）
 - 更丰富的趋势指标（HTTPS 分目标、自定义序列）

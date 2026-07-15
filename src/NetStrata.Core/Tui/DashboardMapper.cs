@@ -35,6 +35,7 @@ public sealed record DashboardViewModel
     public required string Meta { get; init; }
     public required string ProxySummary { get; init; }
     public string? AlertsSummary { get; init; }
+    public IReadOnlyList<AlertView> RecentAlertViews { get; init; } = [];
     public IReadOnlyList<LayerCard> Layers { get; init; } = [];
     public IReadOnlyList<AiApiCard> AiApis { get; init; } = [];
     public IReadOnlyList<PingCard> CustomPings { get; init; } = [];
@@ -89,7 +90,8 @@ public static class DashboardMapper
             AiHeadline = UiStrings.Phrase(lang, verdict.Ai.Headline),
             Meta = UiStrings.CycleMeta(lang, state.Cycle, sample.T, sample.CycleMs.ToString("F0")),
             ProxySummary = BuildProxySummary(pc, sp),
-            AlertsSummary = BuildAlerts(state.RecentAlerts),
+            AlertsSummary = BuildAlerts(state.RecentAlerts, lang),
+            RecentAlertViews = AlertPresenter.TakeRecentViews(state.RecentAlerts, lang),
             Layers = networkLayers,
             AiApis = BuildAiCards(sample, lang),
             CustomPings = BuildCustomTargetCards(sample, lang),
@@ -164,11 +166,12 @@ public static class DashboardMapper
         return cards;
     }
 
-    private static string BuildAlerts(IReadOnlyList<Alert> alerts)
+    private static string BuildAlerts(IReadOnlyList<Alert> alerts, string lang)
     {
         if (alerts.Count == 0)
             return null!;
-        return string.Join(" · ", alerts.TakeLast(3).Select(a => a.Message));
+        // ponytail: overview strip = plain titles only; detail lives on Alerts page
+        return AlertPresenter.SummaryLine(alerts, lang);
     }
 
     private static string BuildProxySummary(ProxyConfig pc, SystemProxySettings sp)

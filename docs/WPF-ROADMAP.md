@@ -84,11 +84,11 @@ dotnet run --project src/NetStrata.Tray
 
 | 步 | ID | 改动面 | 做法 | 验收 |
 |----|-----|--------|------|------|
-| 1 | **W8a** | `App.xaml.cs`、`MainWindow` | GUI 保持 `OnExplicitShutdown`；`Closing`：若非 `_forceClose` 则 `e.Cancel=true` + `Hide()` | 点 × 后托盘仍在；约 5s 后 `state.json` 时间戳继续前进 |
-| 2 | **W8b** | `TrayHost` | 「退出」：设 force-close → 停 Daemon → `main.Close()` → `Application.Shutdown()`；`OnExit` 已有 Dispose/Mutex 释放保持不变 | 任务管理器无残留 `NetStrata.exe` |
-| 3 | **W8c** | `App.xaml.cs` + 薄 IPC | Mutex 抢失败时：`EventWaitHandle`（或等价）通知首实例 `ShowMain`，本进程 `Shutdown(0)`，去掉仅 MessageBox | 再开 exe → 已有主窗置前，无第二写盘进程 |
-| 4 | **W8d** | `UserConfigLoader` / 设置窗 / `App` | `startMinimized`：启动时主窗不 `Show`（或 Show+Hide），只起托盘+Daemon | 登录自启不抢焦点；托盘双击可开窗 |
-| 5 | **W8e** | `README.md`、`USAGE.md`、`UiStrings` | 文案「关闭窗口将继续在托盘运行」；设置项说明 | 与行为一致 |
+| 1 | **W8a** | `App.xaml.cs`、`MainWindow` | ✅ GUI `OnExplicitShutdown`；`Closing`：非 `_forceClose` → Cancel+Hide | 点 × 后托盘仍在；`state.json` 继续更新 |
+| 2 | **W8b** | `TrayHost` | ✅ 「退出」：停 Daemon → `AllowClose` → `Application.Shutdown` | 无残留进程 |
+| 3 | **W8c** | `App.xaml.cs` + 薄 IPC | ✅ Mutex 抢失败时：`ShowMainSignal` 通知首实例 `ShowMain`，本进程退出 | 再开 exe → 已有主窗置前 |
+| 4 | **W8d** | `UserConfigLoader` / 设置窗 / `App` | ✅ `startMinimized`：启动只留托盘+Daemon | 自启不抢焦点 |
+| 5 | **W8e** | `README.md`、`USAGE.md`、设置说明 | ✅ 文案「关闭窗口将继续在托盘运行」 | 与行为一致 |
 
 ### 实现要点（懒路径）
 
@@ -119,3 +119,51 @@ W8d（可跟设置窗一起）:
 - 不做 Windows 服务
 - 不引 WebView2 / 新 UI 框架
 - W8 不碰样本格式与趋势/流转数据路径
+
+---
+
+## Phase W9 — 探测链路可用性与信息架构（迭代方案）
+
+原则：静态可读优先，动画只解释变化；一处事实源一处展示；异常永远置顶。
+
+### 迭代 1 · 止血（W9a–c）
+
+| 步 | 内容 | 验收 |
+|---|---|---|
+| W9a | ✅ 指纹跳过 Bind；播放中挂起播完再换 | 动画能完整播完 |
+| W9b | ✅ `SetBlocks` 原地重排，不再 Clear 全部重建 | 5s 刷新无闪烁、展开态稳定 |
+| W9c | ✅ 失败 > 降级 > 代理 > 正常；块头状态徽章 | 异常目标第一屏可见 |
+
+### 迭代 2 · 信息架构（W9d–f）
+
+| 步 | 内容 | 验收 |
+|---|---|---|
+| W9d | ✅ 展开即见静态终态路径，「播放」改为「重放」 | 不点播放也能看懂 |
+| W9e | ✅ 出口切换标记：对比上一采样，块头显示「出口已切换 ⇄」 | 直连→代理切换一眼可见 |
+| W9f | ✅ 顶部「公共路径」条，移除重复 ChainList 分层卡 | 一屏看清因果链 |
+
+### 迭代 3 · 联动打磨（W9g–i）
+
+| 步 | 内容 |
+|---|---|
+| W9g | ✅ 目标块「趋势」→ 跳转趋势页并显示关注横幅（分目标序列后续） |
+| W9h | ✅ 出口/状态变化时块边框闪一下（事件通知，不自动播放） |
+| W9i | ✅ 探测链路空状态可点「立即探测」（键盘可达不做） |
+
+W8 收尾（W8c 二次启动激活已有窗、W8d startMinimized）与迭代 3 并行。
+
+---
+
+## Phase W10 — 通知告警可读页（进行中）
+
+目标：告警持久化成独立页；中英白话；非专业用户也能读懂（不再直接甩 `proxy egress IPv4 → IPv6`）。
+
+| 步 | ID | 状态 | 交付物 |
+|----|-----|------|--------|
+| 1 | W10a | ✅ | `AlertPresenter`：按 type 出标题+细节；缩短 IPv6 |
+| 2 | W10b | ✅ | `alerts.jsonl` + Daemon 周期追加；主窗「通知告警」页 |
+| 3 | W10c | ✅ | 总览条 / 托盘 Balloon / 导出报告改用可读文案 |
+| 4 | W10d | ✅ | 空状态「立即探测」CTA；全部/重要/提醒/提示筛选；列表可展开详情 |
+| 5 | W10e | ✅ | W8c 二次启动激活 + W9i 链路空状态探测；键盘可达 / W8d 另开 |
+
+数据文件：`%APPDATA%\NetStrata\data\alerts.jsonl`（最多约 500 行）。

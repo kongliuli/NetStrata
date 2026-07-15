@@ -45,6 +45,28 @@ public sealed class SettingsMapperTests
     }
 
     [Fact]
+    public void RoundTrip_PreservesStartMinimized()
+    {
+        var config = new UserConfig { StartMinimized = true, Lang = "en" };
+        var form = SettingsMapper.ToForm(config);
+        Assert.True(form.StartMinimized);
+        var back = SettingsMapper.FromForm(form with { StartMinimized = true }, config);
+        Assert.True(back.StartMinimized);
+
+        var path = Path.Combine(Path.GetTempPath(), "netstrata-sm-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            UserConfigLoader.Save(path, back);
+            Assert.True(UserConfigLoader.Load(path).StartMinimized);
+        }
+        finally
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void FromForm_EmptyPingKeepsExistingTargets()
     {
         var existing = new UserConfig

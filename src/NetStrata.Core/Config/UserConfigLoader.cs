@@ -34,6 +34,10 @@ public sealed class UserConfig
     [JsonPropertyName("theme")]
     public string? Theme { get; init; }
 
+    /// <summary>When true, GUI launch shows tray + daemon only (no main window).</summary>
+    [JsonPropertyName("startMinimized")]
+    public bool StartMinimized { get; init; }
+
     [JsonPropertyName("judge")]
     public JudgeConfig? Judge { get; init; }
 }
@@ -84,6 +88,7 @@ public sealed record SettingsFormModel
     public string TlsStackTargets { get; init; } = "";
     public string Lang { get; init; } = "zh";
     public string Theme { get; init; } = "system";
+    public bool StartMinimized { get; init; }
 }
 
 public static class SettingsMapper
@@ -100,7 +105,8 @@ public static class SettingsMapper
             PingLabels = string.Join(Environment.NewLine, labels),
             TlsStackTargets = string.Join(Environment.NewLine, config.TlsStackTargets),
             Lang = string.IsNullOrWhiteSpace(config.Lang) ? "zh" : config.Lang!,
-            Theme = string.IsNullOrWhiteSpace(config.Theme) ? "system" : config.Theme!
+            Theme = string.IsNullOrWhiteSpace(config.Theme) ? "system" : config.Theme!,
+            StartMinimized = config.StartMinimized
         };
     }
 
@@ -158,6 +164,7 @@ public static class SettingsMapper
             HttpsExtra = existing?.HttpsExtra ?? [],
             Lang = lang,
             Theme = ThemeResolver.ToConfig(ThemeResolver.Parse(form.Theme)),
+            StartMinimized = form.StartMinimized,
             Judge = existing?.Judge
         };
     }

@@ -8,6 +8,20 @@ namespace NetStrata.Core.Tests.Probes;
 public sealed class HttpsProbeTests
 {
     [Fact]
+    public void EffectiveProxyUrl_Direct_NeverUsesProxy()
+    {
+        Assert.Null(HttpsProbe.EffectiveProxyUrl("direct", "http://127.0.0.1:7890"));
+        Assert.Null(HttpsProbe.EffectiveProxyUrl("DIRECT", "http://127.0.0.1:7890"));
+    }
+
+    [Fact]
+    public void EffectiveProxyUrl_Proxy_UsesDetectedUrl()
+    {
+        Assert.Equal("http://127.0.0.1:7890", HttpsProbe.EffectiveProxyUrl("proxy", "http://127.0.0.1:7890"));
+        Assert.Null(HttpsProbe.EffectiveProxyUrl("proxy", null));
+    }
+
+    [Fact]
     public async Task Timing_PopulatesSegmentFields()
     {
         using var listener = new TcpListener(IPAddress.Loopback, 0);

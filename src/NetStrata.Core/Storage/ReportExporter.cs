@@ -181,7 +181,10 @@ public sealed class ReportExporter
             lines.Add("## 近期告警");
             lines.Add("");
             foreach (var a in report.RecentAlerts)
-                lines.Add($"- [{a.Type}] {a.Message}");
+            {
+                var view = Ui.AlertPresenter.Format(a, "zh");
+                lines.Add($"- {view.Title}：{view.Detail}");
+            }
             lines.Add("");
         }
 

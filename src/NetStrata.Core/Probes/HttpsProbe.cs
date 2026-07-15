@@ -50,6 +50,10 @@ public sealed class HttpsProbe : IProbe<IReadOnlyList<HttpsResult>>
         return await Task.WhenAll(tasks);
     }
 
+    /// <summary>Only Via=proxy may use the detected proxy; direct must not inherit it (false dual-OK).</summary>
+    public static string? EffectiveProxyUrl(string via, string? proxyUrl) =>
+        via.Equals("proxy", StringComparison.OrdinalIgnoreCase) ? proxyUrl : null;
+
     private async Task<HttpsResult> ProbeOneAsync(HttpTarget target, string? proxyUrl, CancellationToken ct)
     {
         var totalSw = Stopwatch.StartNew();
@@ -71,7 +75,9 @@ public sealed class HttpsProbe : IProbe<IReadOnlyList<HttpsResult>>
         dnsMs = dnsSw.Elapsed.TotalMilliseconds;
 
         var connectMs = 0.0;
-        using var handler = CreateHandler(proxyUrl, ms => connectMs = ms);
+        // ponytail: was always UseProxy when proxyUrl set — *_direct looked OK via Clash
+        var effectiveProxy = EffectiveProxyUrl(target.Via, proxyUrl);
+        using var handler = CreateHandler(effectiveProxy, ms => connectMs = ms);
         using var client = new HttpClient(handler) { Timeout = _timeout };
 
         try
