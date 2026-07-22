@@ -1,0 +1,14 @@
+{
+  "schema_version": 2,
+  "active_work_id": "analysis-report",
+  "works": {
+    "analysis-report": {
+      "work_id": "analysis-report",
+      "active_plan": ".omo/plans/analysis-report.md",
+      "plan_name": "analysis-report",
+      "session_ids": ["codex:ses_current"],
+      "status": "active",
+      "worktree_path": null
+    }
+  }
+}
