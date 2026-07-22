@@ -132,6 +132,7 @@ flowchart TD
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 分期计划 |
 | [docs/WPF-ROADMAP.md](docs/WPF-ROADMAP.md) | WPF 与单 exe 架构 |
 | [docs/NETWORK-FLOW-VISUALIZATION.md](docs/NETWORK-FLOW-VISUALIZATION.md) | WPF 多层网络流转、动画与数据语义 |
+| [docs/UI-POLISH.md](docs/UI-POLISH.md) | UI 业务流梳理与 HandyControl 深度美化（W11） |
 | [scripts/README.md](scripts/README.md) | agent-loop、health-check |
 
 ---
