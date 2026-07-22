@@ -13,7 +13,8 @@
                  Foreground="{DynamicResource SecondaryTextBrush}" TextWrapping="Wrap"
                  Text="本轮采样尚无 HTTPS 监控目标。"/>
       <Button x:Name="EmptyProbeButton" Content="立即探测" Margin="0,12,0,0"
-              HorizontalAlignment="Left" MinWidth="120" Padding="14,6"
+              HorizontalAlignment="Left" MinWidth="120" Height="36" Padding="14,6"
+              Style="{DynamicResource ButtonPrimary}"
               Click="EmptyProbe_Click"/>
     </StackPanel>
     <StackPanel x:Name="BlocksHost"/>

@@ -21,7 +21,8 @@
       <Expander.Header>
         <DockPanel Margin="0,2,8,2">
           <Border x:Name="OutcomeDot" DockPanel.Dock="Left" Width="8" Height="8" CornerRadius="4"
-                  Margin="0,0,10,0" VerticalAlignment="Center" Background="#9AA0A6"/>
+                  Margin="0,0,10,0" VerticalAlignment="Center"
+                  Background="{DynamicResource NsStatusSkippedBrush}"/>
           <Border x:Name="BadgeBorder" DockPanel.Dock="Right" Padding="7,2" CornerRadius="10"
                   Margin="8,0,0,0" VerticalAlignment="Top" BorderThickness="1">
             <TextBlock x:Name="BadgeText" FontSize="10" FontWeight="SemiBold"/>
@@ -32,10 +33,11 @@
               <TextBlock x:Name="EgressText" FontSize="11"
                          Foreground="{DynamicResource PrimaryBrush}" TextWrapping="Wrap"/>
               <Border x:Name="EgressFlipBadge" Margin="8,0,0,0" Padding="6,1" CornerRadius="8"
-                      Background="#33FBBC04" BorderBrush="#FBBC04" BorderThickness="1"
+                      Background="{DynamicResource NsStatusDegradedSoftBrush}"
+                      BorderBrush="{DynamicResource NsStatusDegradedBrush}" BorderThickness="1"
                       Visibility="Collapsed" VerticalAlignment="Center">
                 <TextBlock x:Name="EgressFlipText" Text="出口已切换 ⇄" FontSize="10" FontWeight="SemiBold"
-                           Foreground="#B06000"/>
+                           Foreground="{DynamicResource NsStatusDegradedBrush}"/>
               </Border>
             </StackPanel>
             <TextBlock x:Name="SummaryText" Margin="0,2,0,0" FontSize="11"

@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 using NetStrata.Core.Flow;
+using NetStrata.Core.Ui;
 using NetStrata.Tray.Services;
 using WpfColor = System.Windows.Media.Color;
 using WpfColorConverter = System.Windows.Media.ColorConverter;
@@ -489,35 +490,28 @@ public partial class TargetFlowBlock : WpfUserControl
         _ => "—"
     };
 
-    private SolidColorBrush StateBrush(FlowNodeState state)
+    private SolidColorBrush StateBrush(FlowNodeState state) => state switch
     {
-        var dark = ThemeApplier.CurrentPalette() == NetStrata.Core.Ui.ThemeResolver.Dark;
-        return state switch
-        {
-            FlowNodeState.Active => AccentBrush(),
-            FlowNodeState.Passed => Brush(dark ? "#81C995" : "#137333"),
-            FlowNodeState.Degraded => Brush(dark ? "#FDD663" : "#B06000"),
-            FlowNodeState.Failed => Brush(dark ? "#F28B82" : "#C5221F"),
-            _ => Brush(ThemeApplier.CurrentPalette().Muted)
-        };
-    }
+        FlowNodeState.Active => AccentBrush(),
+        FlowNodeState.Passed => StatusBrushes.Accent(StatusKind.Ok),
+        FlowNodeState.Degraded => StatusBrushes.Accent(StatusKind.Degraded),
+        FlowNodeState.Failed => StatusBrushes.Accent(StatusKind.Fail),
+        _ => StatusBrushes.Accent(StatusKind.Skipped)
+    };
 
-    private SolidColorBrush AccentBrush() => Brush(ThemeApplier.CurrentPalette().Accent);
-    private bool IsEnglish() =>
-        string.Equals(_trace?.Language ?? _block?.Trace.Language, "en", StringComparison.OrdinalIgnoreCase);
-
-    private static SolidColorBrush SoftBrush(SolidColorBrush solid)
+    private SolidColorBrush AccentBrush()
     {
-        var c = solid.Color;
-        var soft = new SolidColorBrush(WpfColor.FromArgb(40, c.R, c.G, c.B));
-        soft.Freeze();
-        return soft;
-    }
-
-    private static SolidColorBrush Brush(string hex)
-    {
-        var brush = new SolidColorBrush((WpfColor)WpfColorConverter.ConvertFromString(hex)!);
+        if (System.Windows.Application.Current?.TryFindResource("Accent") is SolidColorBrush b)
+            return b;
+        var brush = new SolidColorBrush(
+            (WpfColor)WpfColorConverter.ConvertFromString(ThemeApplier.CurrentPalette().Accent)!);
         brush.Freeze();
         return brush;
     }
+
+    private bool IsEnglish() =>
+        string.Equals(_trace?.Language ?? _block?.Trace.Language, "en", StringComparison.OrdinalIgnoreCase);
+
+    private static SolidColorBrush SoftBrush(SolidColorBrush solid) =>
+        StatusBrushes.Soft(StatusTokens.FromBorderHex($"#{solid.Color.R:X2}{solid.Color.G:X2}{solid.Color.B:X2}"));
 }

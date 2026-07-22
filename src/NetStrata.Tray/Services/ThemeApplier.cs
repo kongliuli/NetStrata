@@ -31,7 +31,11 @@ internal static class ThemeApplier
         target.Resources["AlertFg"] = Brush(palette.AlertFg);
         target.Resources["AlertBorder"] = Brush(palette.AlertBorder);
 
+        ApplyStatusTokens(target.Resources, IsDark(palette));
         ApplyHandySkin(palette);
+        // also push status tokens to Application so DynamicResource in XAML resolves before first Apply
+        if (System.Windows.Application.Current is not null)
+            ApplyStatusTokens(System.Windows.Application.Current.Resources, IsDark(palette));
     }
 
     public static void ApplyHandySkin() => ApplyHandySkin(CurrentPalette());
@@ -58,11 +62,33 @@ internal static class ThemeApplier
         }
 
         _appliedSkin = skin;
+        ApplyStatusTokens(app.Resources, dark);
+    }
+
+    private static void ApplyStatusTokens(ResourceDictionary resources, bool dark)
+    {
+        void Set(string key, string hex) => resources[key] = Brush(hex);
+
+        Set(StatusTokens.ResourceOk, StatusTokens.AccentHex(StatusKind.Ok, dark));
+        Set(StatusTokens.ResourceOkSoft, StatusTokens.SoftHex(StatusKind.Ok, dark));
+        Set(StatusTokens.ResourceDegraded, StatusTokens.AccentHex(StatusKind.Degraded, dark));
+        Set(StatusTokens.ResourceDegradedSoft, StatusTokens.SoftHex(StatusKind.Degraded, dark));
+        Set(StatusTokens.ResourceFail, StatusTokens.AccentHex(StatusKind.Fail, dark));
+        Set(StatusTokens.ResourceFailSoft, StatusTokens.SoftHex(StatusKind.Fail, dark));
+        Set(StatusTokens.ResourceSkipped, StatusTokens.AccentHex(StatusKind.Skipped, dark));
+        Set(StatusTokens.ResourceSkippedSoft, StatusTokens.SoftHex(StatusKind.Skipped, dark));
+        Set(StatusTokens.ResourceInfo, StatusTokens.AccentHex(StatusKind.Info, dark));
+        Set(StatusTokens.ResourceInfoSoft, StatusTokens.SoftHex(StatusKind.Info, dark));
     }
 
     private static bool IsDark(ThemePalette palette) =>
         string.Equals(palette.WindowBg, ThemeResolver.Dark.WindowBg, StringComparison.OrdinalIgnoreCase);
 
-    private static SolidColorBrush Brush(string hex) =>
-        new((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hex)!);
+    private static SolidColorBrush Brush(string hex)
+    {
+        var brush = new SolidColorBrush(
+            (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hex)!);
+        brush.Freeze();
+        return brush;
+    }
 }
