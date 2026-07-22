@@ -275,3 +275,59 @@ tests/NetStrata.Core.Tests/
 ```
 
 不包含 Web/Daemon，确保 `--once` 可跑通。
+
+---
+
+## Post-Phase 5 演進規劃（建議）
+
+> 以下為基於完整競品分析和架構健康度評估提出的後續演進建議。
+> 詳見 [ANALYSIS-REPORT.md](ANALYSIS-REPORT.md)。
+
+### 階段 A：Foundation Hardening（基礎穩固）
+
+| # | 任務 | 優先級 | 工作量 |
+|---|------|--------|--------|
+| A1 | 引入 DI 容器（Microsoft.Extensions.DependencyInjection） | P0 | 中 |
+| A2 | 建立 IEventBus 事件匯流排（InProcessEventBus） | P0 | 中 |
+| A3 | 提取 MainWindowViewModel（分批遷移 code-behind） | P0 | 大 |
+| A4 | 建立 CI 管線（GitHub Actions build+test） | P1 | 小 |
+| A5 | 修復 DashboardMapperTests 測試失敗 | P1 | 小 |
+
+### 階段 B：Event-Driven + Web Dashboard
+
+| # | 任務 | 優先級 | 工作量 |
+|---|------|--------|--------|
+| B1 | TrayHost 改為事件訂閱（移除 5s DispatcherTimer） | P0 | 中 |
+| B2 | Tray 懸停摘要顯示狀態摘要 | P1 | 小 |
+| B3 | Action Center Toast 通知 | P1 | 小 |
+| B4 | 啟用 --web：Kestrel + SSE + htmx 儀表板 | P1 | 中 |
+| B5 | 路徑逐跳可視化 + GeoIP 海外層強化 | P1 | 中 |
+| B6 | 代理鏈可視化 + 單層鑽取 | P1 | 中 |
+
+### 階段 C：Alerts + History
+
+| # | 任務 | 優先級 | 工作量 |
+|---|------|--------|--------|
+| C1 | Webhook 多通道警報（Slack/Discord/自訂） | P1 | 中 |
+| C2 | SQLite 歷史資料庫（raw 30天 + 聚合永久） | P1 | 中 |
+| C3 | 歷史趨勢圖 + 穩定度評分（SQI） | P2 | 中 |
+| C4 | 報告匯出（Markdown→PDF/HTML） | P2 | 小 |
+| C5 | 自動更新機制 | P2 | 中 |
+
+### 階段 D：進階功能（Long-term）
+
+| # | 任務 | 優先級 |
+|---|------|--------|
+| D1 | AI 輔助判決解釋（自然語言） | P2 |
+| D2 | 多目標對比監控 | P2 |
+| D3 | 網路變更時間軸 | P2 |
+| D4 | Tailscale 深度整合（節點列表+延遲） | P2 |
+| D5 | 一鍵分享診斷報告 | P2 |
+
+### 不做（No-go）
+
+- 不改成 Rust/Tauri
+- 不追 PingPlotter 功能完整度
+- 不先做跨平台
+- 不先做 MAUI/手機 App
+- 不做雲端 SaaS
