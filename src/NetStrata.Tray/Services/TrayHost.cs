@@ -31,6 +31,14 @@ internal sealed class TrayHost : IDisposable
     private bool _probing;
     private string _lang = "zh";
 
+    /// <summary>W11b: shared busy flag so main-window ProgressButton can mirror tray state.</summary>
+    public event Action<bool>? ProbeBusyChanged;
+
+    /// <summary>W11b: ok + message after a manual probe finishes.</summary>
+    public event Action<bool, string>? ProbeFinished;
+
+    public bool IsProbing => _probing;
+
     public TrayHost(IOnceProbeRunner? probeRunner = null, InProcessDaemonController? daemon = null)
     {
         _probeRunner = probeRunner ?? new OnceProbeRunner();
@@ -199,19 +207,27 @@ internal sealed class TrayHost : IDisposable
 
         _probing = true;
         _probeItem.Enabled = false;
-        _probeItem.Text = "探测中…";
+        _probeItem.Text = UiStrings.T(_lang, "探测中…", "Probing…");
+        RaiseProbeBusy(true);
         try
         {
             var result = await _probeRunner.RunAsync();
             if (result.Ok)
             {
                 var msg = $"{result.Overall}: {result.Headline}";
-                _icon.ShowBalloonTip(5000, "NetStrata 探测完成", msg, ToolTipIcon.Info);
+                _icon.ShowBalloonTip(5000,
+                    UiStrings.T(_lang, "NetStrata 探测完成", "NetStrata probe done"),
+                    msg, ToolTipIcon.Info);
                 _lastHeadline = result.Headline;
+                RaiseProbeFinished(true, msg);
             }
             else
             {
-                _icon.ShowBalloonTip(5000, "NetStrata 探测失败", result.Error ?? "unknown", ToolTipIcon.Error);
+                var err = result.Error ?? "unknown";
+                _icon.ShowBalloonTip(5000,
+                    UiStrings.T(_lang, "NetStrata 探测失败", "NetStrata probe failed"),
+                    err, ToolTipIcon.Error);
+                RaiseProbeFinished(false, err);
             }
 
             await RefreshAsync();
@@ -222,7 +238,30 @@ internal sealed class TrayHost : IDisposable
             _probing = false;
             _probeItem.Enabled = true;
             _probeItem.Text = UiStrings.TrayProbeNow(_lang);
+            RaiseProbeBusy(false);
         }
+    }
+
+    private void RaiseProbeBusy(bool busy)
+    {
+        void Fire() => ProbeBusyChanged?.Invoke(busy);
+        if (_main?.Dispatcher.CheckAccess() == true)
+            Fire();
+        else if (_main is not null)
+            _main.Dispatcher.Invoke(Fire);
+        else
+            Fire();
+    }
+
+    private void RaiseProbeFinished(bool ok, string message)
+    {
+        void Fire() => ProbeFinished?.Invoke(ok, message);
+        if (_main?.Dispatcher.CheckAccess() == true)
+            Fire();
+        else if (_main is not null)
+            _main.Dispatcher.Invoke(Fire);
+        else
+            Fire();
     }
 
     /// <summary>Show / activate main window (tray menu, double-click, or second-instance signal).</summary>
@@ -239,16 +278,26 @@ internal sealed class TrayHost : IDisposable
         _ = _main.RefreshAsync();
     }
 
-    private void OpenSettings()
+    /// <summary>W11e: single non-modal settings instance for tray + main window.</summary>
+    public void OpenSettings()
     {
         if (_settings is { IsLoaded: true })
         {
+            if (!_settings.IsVisible)
+                _settings.Show();
             _settings.Activate();
             return;
         }
 
         _settings = new Views.SettingsWindow(RestartDaemonWithOptionsAsync);
-        _settings.Closed += (_, _) => _settings = null;
+        if (_main is not null)
+            _settings.Owner = _main;
+        _settings.Closed += async (_, _) =>
+        {
+            _settings = null;
+            if (_main is not null)
+                await _main.RefreshAsync();
+        };
         _settings.Show();
     }
 
