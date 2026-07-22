@@ -69,9 +69,13 @@ public partial class App : System.Windows.Application
             _tray = new TrayHost();
             _main = new MainWindow(
                 probeNow: () => _tray.RequestProbe(),
+                openSettings: () => _tray.OpenSettings(),
                 restartDaemon: opts => _tray.RestartDaemonWithOptionsAsync(opts));
             MainWindow = _main;
             _tray.AttachMainWindow(_main);
+            // W11b: ProgressButton busy + Growl share tray probe pipeline
+            _tray.ProbeBusyChanged += busy => _main.SetProbeBusy(busy);
+            _tray.ProbeFinished += (ok, msg) => _main.ShowProbeResult(ok, msg);
             // W8d: login / quiet start — tray + daemon only until user opens from tray
             var startMinimized = UserConfigLoader.Load(DataDirectory.ConfigPath).StartMinimized;
             if (!startMinimized)

@@ -32,16 +32,22 @@ public partial class MainWindow : HcWindow
     private readonly DispatcherTimer _timer;
     private readonly IBrowserLauncher _browser;
     private readonly Action? _probeNow;
+    private readonly Action? _openSettings;
     private readonly Func<NetStrataOptions, Task<(bool Ok, string? Error)>>? _restartDaemon;
     private bool _forceClose;
+    private bool _probeBusy;
+    private int _alertsSeenCount;
+    private int _alertsUnread;
 
     public MainWindow(
         IBrowserLauncher? browser = null,
         Action? probeNow = null,
+        Action? openSettings = null,
         Func<NetStrataOptions, Task<(bool Ok, string? Error)>>? restartDaemon = null)
     {
         _browser = browser ?? new ShellBrowserLauncher();
         _probeNow = probeNow;
+        _openSettings = openSettings;
         _restartDaemon = restartDaemon;
         InitializeComponent();
         ThemeApplier.Apply(this);
@@ -73,6 +79,27 @@ public partial class MainWindow : HcWindow
 
     /// <summary>Allow the next Close / app Shutdown to actually tear down the window.</summary>
     public void AllowClose() => _forceClose = true;
+
+    /// <summary>W11b: mirror tray probing state onto ProgressButton + disable re-entry.</summary>
+    public void SetProbeBusy(bool busy)
+    {
+        _probeBusy = busy;
+        var lang = NetStrataOptions.FromEnvironment().Lang;
+        ProbeButton.IsEnabled = !busy;
+        ProbeButton.IsChecked = busy;
+        ProbeButton.Content = busy
+            ? UiStrings.T(lang, "探测中…", "Probing…")
+            : UiStrings.T(lang, "立即探测", "Probe now");
+    }
+
+    /// <summary>W11b: in-window Growl after manual probe (tray still shows BalloonTip).</summary>
+    public void ShowProbeResult(bool ok, string message)
+    {
+        if (ok)
+            Growl.Success(message);
+        else
+            Growl.Error(message);
+    }
 
     private void OnClosingToTray(object? sender, CancelEventArgs e)
     {
@@ -128,7 +155,6 @@ public partial class MainWindow : HcWindow
             : content - 10;
         targetCard = Math.Clamp(targetCard, 160, 360);
 
-        OverviewAiList.Tag = aiCard;
         AiList.Tag = aiCard;
         TargetsList.Tag = targetCard;
 
@@ -158,7 +184,10 @@ public partial class MainWindow : HcWindow
         if (tag == "trend")
             _ = RefreshTrendAsync();
         if (tag == "alerts")
+        {
+            ClearAlertsBadge();
             _ = RefreshAlertsAsync();
+        }
     }
 
     private void AlertsPanel_Click(object sender, MouseButtonEventArgs e)
@@ -167,9 +196,30 @@ public partial class MainWindow : HcWindow
         ShowPage("alerts");
     }
 
+    private void GotoAi_Click(object sender, MouseButtonEventArgs e)
+    {
+        NavAi.IsSelected = true;
+        ShowPage("ai");
+        e.Handled = true;
+    }
+
+    private void GotoTargets_Click(object sender, MouseButtonEventArgs e)
+    {
+        NavTargets.IsSelected = true;
+        ShowPage("targets");
+        e.Handled = true;
+    }
+
+    private void GotoLocal_Click(object sender, MouseButtonEventArgs e)
+    {
+        NavLocal.IsSelected = true;
+        ShowPage("local");
+        e.Handled = true;
+    }
+
     private void ApplyDensityToCards()
     {
-        foreach (var list in new[] { OverviewAiList, AiList, OverviewTargetsList, TargetsList, LayersList })
+        foreach (var list in new[] { AiList, TargetsList, LayersList })
         {
             if (list.ItemsSource is not System.Collections.IEnumerable items)
                 continue;
@@ -186,11 +236,30 @@ public partial class MainWindow : HcWindow
         if (_sectionStateLoaded)
             return;
         LayersExpander.IsExpanded = LoadSectionExpanded(nameof(LayersExpander), true);
-        OverviewAiExpander.IsExpanded = LoadSectionExpanded(nameof(OverviewAiExpander), true);
-        OverviewTargetsExpander.IsExpanded = LoadSectionExpanded(nameof(OverviewTargetsExpander), true);
-        OverviewLocalExpander.IsExpanded = LoadSectionExpanded(nameof(OverviewLocalExpander), true);
         AiExpander.IsExpanded = LoadSectionExpanded(nameof(AiExpander), true);
         _sectionStateLoaded = true;
+    }
+
+    private void UpdateAlertsBadge(int totalAlerts)
+    {
+        if (totalAlerts > _alertsSeenCount)
+            _alertsUnread += totalAlerts - _alertsSeenCount;
+        _alertsSeenCount = totalAlerts;
+        if (_alertsUnread <= 0 || PageAlerts.Visibility == Visibility.Visible)
+        {
+            ClearAlertsBadge();
+            return;
+        }
+
+        AlertsBadge.Value = _alertsUnread;
+        AlertsBadge.Visibility = Visibility.Visible;
+    }
+
+    private void ClearAlertsBadge()
+    {
+        _alertsUnread = 0;
+        AlertsBadge.Value = 0;
+        AlertsBadge.Visibility = Visibility.Collapsed;
     }
 
     private static bool LoadSectionExpanded(string key, bool fallback)
@@ -227,10 +296,14 @@ public partial class MainWindow : HcWindow
 
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
-        var win = new SettingsWindow(_restartDaemon);
-        win.Owner = this;
-        win.ShowDialog();
-        _ = RefreshAsync();
+        if (_openSettings is not null)
+            _openSettings();
+        else
+        {
+            // fallback when constructed without tray host
+            var win = new SettingsWindow(_restartDaemon) { Owner = this };
+            win.Show();
+        }
     }
 
     public async Task RefreshAsync()
@@ -348,7 +421,7 @@ public partial class MainWindow : HcWindow
             .Select(a =>
             {
                 var view = AlertPresenter.Format(a, lang);
-                var (accent, badge, soft) = AlertSeverityColors(view.Severity, lang);
+                var (accent, badge, soft) = AlertSeverityBrushes(view.Severity, lang);
                 return new AlertRowVm
                 {
                     Title = view.Title,
@@ -356,8 +429,8 @@ public partial class MainWindow : HcWindow
                     When = view.WhenLocal,
                     Badge = badge,
                     Severity = view.Severity,
-                    AccentBrush = Brush(accent),
-                    BadgeBg = Brush(soft)
+                    AccentBrush = accent,
+                    BadgeBg = soft
                 };
             }).ToList();
 
@@ -424,13 +497,18 @@ public partial class MainWindow : HcWindow
         return list;
     }
 
-    private static (string Accent, string Badge, string Soft) AlertSeverityColors(string severity, string lang) =>
-        severity switch
+    private static (System.Windows.Media.Brush Accent, string Badge, System.Windows.Media.Brush Soft)
+        AlertSeverityBrushes(string severity, string lang)
+    {
+        var kind = StatusTokens.FromAlertSeverity(severity);
+        var badge = kind switch
         {
-            "fail" => ("#EA4335", UiStrings.T(lang, "重要", "Important"), "#FCE8E6"),
-            "warn" => ("#F9AB00", UiStrings.T(lang, "提醒", "Notice"), "#FEF7E0"),
-            _ => ("#1A73E8", UiStrings.T(lang, "提示", "Info"), "#E8F0FE")
+            StatusKind.Fail => UiStrings.T(lang, "重要", "Important"),
+            StatusKind.Degraded => UiStrings.T(lang, "提醒", "Notice"),
+            _ => UiStrings.T(lang, "提示", "Info")
         };
+        return (StatusBrushes.Accent(kind), badge, StatusBrushes.Soft(kind));
+    }
 
     private void ApplyPingChart(TrendChartModel chart, bool dark, string lang)
     {
@@ -552,13 +630,8 @@ public partial class MainWindow : HcWindow
             LineSmoothness = 0.2
         };
 
-    private static System.Windows.Media.Brush StateBrush(string? state) => state switch
-    {
-        "ok" => new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x34, 0xA8, 0x53)),
-        "degraded" => new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFB, 0xBC, 0x04)),
-        "fail" => new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xEA, 0x43, 0x35)),
-        _ => new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x9A, 0xA0, 0xA6))
-    };
+    private static System.Windows.Media.Brush StateBrush(string? state) =>
+        StatusBrushes.Border(StatusTokens.FromState(state));
 
     private static string StateLabel(string lang, string? state) => state switch
     {
@@ -576,7 +649,6 @@ public partial class MainWindow : HcWindow
         OverviewHeadline.Text = vm.Meta;
         OverviewAiHeadline.Text = vm.AiHeadline;
         OverviewMeta.Text = vm.ProxySummary;
-        OverviewProxy.Text = "";
         ApplyOverallBadge(vm.Overall);
         HeaderSubtitle.Text = UiStrings.T(lang, "分层网络健康", "Layered network health");
         NavOverview.Header = UiStrings.T(lang, "总览", "Overview");
@@ -584,17 +656,22 @@ public partial class MainWindow : HcWindow
         NavAi.Header = UiStrings.T(lang, "AI / API", "AI / API");
         NavTargets.Header = UiStrings.T(lang, "自定义目标", "Targets");
         NavTrend.Header = UiStrings.SectionTrend(lang);
-        NavAlerts.Header = UiStrings.T(lang, "通知告警", "Alerts");
+        NavAlertsText.Text = UiStrings.T(lang, "通知告警", "Alerts");
         NavLocal.Header = UiStrings.SectionLocal(lang);
         RefreshButton.Content = vm.RefreshLabel;
-        ProbeButton.Content = UiStrings.T(lang, "立即探测", "Probe now");
+        if (!_probeBusy)
+            ProbeButton.Content = UiStrings.T(lang, "立即探测", "Probe now");
         SettingsButton.Content = UiStrings.SettingsTitle(lang);
         LayersTitle.Text = vm.LayersTitle;
         OverviewAiTitle.Text = vm.AiTitle;
-        OverviewAiHint.Text = UiStrings.OpenSiteHint(lang);
+        OverviewAiMore.Text = UiStrings.T(lang, "详情 →", "Details →");
+        OverviewTargetsMore.Text = UiStrings.T(lang, "详情 →", "Details →");
+        OverviewLocalMore.Text = UiStrings.T(lang, "详情 →", "Details →");
         OverviewLocalTitle.Text = local.Title;
         AlertsPanelTitle.Text = UiStrings.T(lang, "近期通知", "Recent alerts");
         AlertsMoreHint.Text = UiStrings.T(lang, "查看全部 →", "See all →");
+
+        UpdateAlertsBadge(vm.RecentAlertViews.Count);
 
         if (vm.RecentAlertViews.Count == 0)
         {
@@ -630,26 +707,33 @@ public partial class MainWindow : HcWindow
         {
             Title = l.DisplayName,
             Subtitle = l.StateLabel,
-            AccentBrush = Brush(l.BorderColor),
+            Detail = UiStrings.T(lang, "点击查看探测链路", "Click to open probe chain"),
+            AccentBrush = StatusBrushes.FromBorderHex(l.BorderColor),
             Badge = l.StateLabel,
-            BadgeBg = SoftBrush(l.BorderColor)
+            BadgeBg = StatusBrushes.FromBorderHex(l.BorderColor, soft: true)
         }.WithDensity(_density)).ToList();
 
-        OverviewAiList.ItemsSource = BuildAiCards(vm, lang);
+        var aiOk = vm.AiApis.Count(a =>
+            a.Detail.Contains("均可", StringComparison.Ordinal)
+            || a.Detail.Contains("direct + proxy", StringComparison.OrdinalIgnoreCase));
+        OverviewAiSummary.Text = vm.AiApis.Count == 0
+            ? UiStrings.T(lang, "尚无 AI API 探测数据", "No AI API probe data yet")
+            : UiStrings.T(lang,
+                $"{vm.AiApis.Count} 个服务 · {aiOk} 个双路径可达 · {vm.AiHeadline}",
+                $"{vm.AiApis.Count} services · {aiOk} dual-path OK · {vm.AiHeadline}");
 
         OverviewTargetsTitle.Text = vm.PingTitle;
-        OverviewTargetsExpanderHost.Visibility = vm.HasCustomPings ? Visibility.Visible : Visibility.Collapsed;
-        OverviewTargetsList.ItemsSource = vm.CustomPings.Select(p => new CardVm
-        {
-            Title = p.Label,
-            Badge = ShortState(p.State),
-            Subtitle = p.Detail,
-            AccentBrush = Brush(p.BorderColor),
-            BadgeBg = SoftBrush(p.BorderColor),
-            Url = p.Url ?? (p.Kind == "https" ? p.Target : null)
-        }.WithDensity(_density)).ToList();
+        OverviewTargetsExpanderHost.Visibility = Visibility.Visible;
+        OverviewTargetsSummary.Text = vm.HasCustomPings
+            ? UiStrings.T(lang,
+                $"{vm.CustomPings.Count} 个自定义目标（Ping / HTTPS）",
+                $"{vm.CustomPings.Count} custom targets (ping / HTTPS)")
+            : UiStrings.T(lang, "尚未添加自定义目标", "No custom targets yet");
 
-        OverviewLocalList.ItemsSource = local.Rows.Select(r => new KvVm { Label = r.Label, Value = r.Value }).ToList();
+        var localBits = local.Rows.Take(3).Select(r => $"{r.Label} {r.Value}");
+        OverviewLocalSummary.Text = local.Rows.Count == 0
+            ? UiStrings.T(lang, "暂无本机网络信息", "No local network info yet")
+            : string.Join(" · ", localBits);
     }
 
     private void ApplyChain(ChainViewModel vm)
@@ -664,15 +748,31 @@ public partial class MainWindow : HcWindow
             { "wifi", "lan", "broadband", "overseas_direct", "proxy" };
         TrunkStrip.ItemsSource = vm.Rows
             .Where(r => trunkKeys.Contains(r.LayerKey))
-            .Select(r => new ChainRowVm
+            .Select(r =>
             {
-                Title = r.DisplayName,
-                Badge = r.StateLabel,
-                Reasons = "",
-                Metrics = "",
-                AccentBrush = Brush(r.BorderColor),
-                BadgeBg = SoftBrush(r.BorderColor)
+                var reasons = string.Join(" · ", r.Reasons.Where(x => !string.IsNullOrWhiteSpace(x)));
+                var tip = string.Join("\n", new[] { reasons, r.MetricsSummary }
+                    .Where(x => !string.IsNullOrWhiteSpace(x)));
+                return new ChainRowVm
+                {
+                    Title = r.DisplayName,
+                    Badge = r.StateLabel,
+                    Reasons = reasons,
+                    Metrics = r.MetricsSummary ?? "",
+                    Tip = string.IsNullOrWhiteSpace(tip)
+                        ? r.StateLabel
+                        : tip,
+                    AccentBrush = StatusBrushes.FromBorderHex(r.BorderColor),
+                    BadgeBg = StatusBrushes.FromBorderHex(r.BorderColor, soft: true)
+                };
             }).ToList();
+    }
+
+    private void LayerCard_Click(object sender, MouseButtonEventArgs e)
+    {
+        NavChain.IsSelected = true;
+        ShowPage("chain");
+        e.Handled = true;
     }
 
     private void ApplyAi(DashboardViewModel vm, string lang)
@@ -687,10 +787,10 @@ public partial class MainWindow : HcWindow
         {
             Title = a.Name,
             // L1 badge = short status; L2 detail = path summary; L3 = latency rows
-            Badge = ShortStateFromDetail(a.Detail, a.DirectState, a.ProxyState),
+            Badge = ShortStateFromDetail(lang, a.Detail, a.DirectState, a.ProxyState),
             Detail = a.Detail,
-            BadgeBg = SoftBrush(a.BorderColor),
-            AccentBrush = Brush(a.BorderColor),
+            BadgeBg = StatusBrushes.FromBorderHex(a.BorderColor, soft: true),
+            AccentBrush = StatusBrushes.FromBorderHex(a.BorderColor),
             DirectLabel = UiStrings.Direct(lang),
             ProxyLabel = UiStrings.ViaProxy(lang),
             DirectValue = $"{a.DirectState} · {a.DirectMs}",
@@ -698,27 +798,48 @@ public partial class MainWindow : HcWindow
             Url = a.OpenUrl
         }.WithDensity(_density)).ToList();
 
-    private static string ShortState(string state) => state switch
-    {
-        "ok" => "正常",
-        "fail" => "失败",
-        "degraded" => "降级",
-        "skipped" => "跳过",
-        _ => state
-    };
+    private static string ShortState(string lang, string state) =>
+        state switch
+        {
+            "ok" or "fail" or "degraded" => UiStrings.StateName(lang, state),
+            "skipped" => UiStrings.T(lang, "跳过", "Skipped"),
+            _ => state
+        };
 
-    private static string ShortStateFromDetail(string detail, string direct, string proxy)
+    /// <summary>W11d: prefer structured direct/proxy states; avoid Chinese substring matching.</summary>
+    private static string ShortStateFromDetail(string lang, string detail, string direct, string proxy)
     {
-        if (detail.Contains("均可", StringComparison.Ordinal) || detail.Contains("direct + proxy", StringComparison.OrdinalIgnoreCase))
-            return "正常";
-        if (detail.Contains("不可达", StringComparison.Ordinal) || detail.Contains("unreachable", StringComparison.OrdinalIgnoreCase))
-            return "失败";
-        if (detail.Contains("仅", StringComparison.Ordinal) || detail.Contains("only", StringComparison.OrdinalIgnoreCase))
-            return "降级";
-        if (direct.Contains("正常", StringComparison.Ordinal) || proxy.Contains("正常", StringComparison.Ordinal)
-            || direct.Equals("OK", StringComparison.OrdinalIgnoreCase) || proxy.Equals("OK", StringComparison.OrdinalIgnoreCase))
-            return "正常";
-        return "失败";
+        var d = NormalizeProbeState(direct);
+        var p = NormalizeProbeState(proxy);
+        if (d == "ok" && p == "ok")
+            return UiStrings.StateName(lang, "ok");
+        if (d == "ok" || p == "ok")
+            return UiStrings.StateName(lang, "degraded");
+        if (detail.Contains("direct + proxy", StringComparison.OrdinalIgnoreCase)
+            || detail.Contains("均可", StringComparison.Ordinal))
+            return UiStrings.StateName(lang, "ok");
+        if (detail.Contains("only", StringComparison.OrdinalIgnoreCase)
+            || detail.Contains("仅", StringComparison.Ordinal))
+            return UiStrings.StateName(lang, "degraded");
+        return UiStrings.StateName(lang, "fail");
+    }
+
+    private static string NormalizeProbeState(string raw)
+    {
+        var s = (raw ?? "").Trim();
+        if (s.Equals("ok", StringComparison.OrdinalIgnoreCase)
+            || s.Equals("OK", StringComparison.Ordinal)
+            || s.Contains("正常", StringComparison.Ordinal))
+            return "ok";
+        if (s.Contains("降级", StringComparison.Ordinal)
+            || s.Equals("degraded", StringComparison.OrdinalIgnoreCase))
+            return "degraded";
+        if (s.Contains("跳过", StringComparison.Ordinal)
+            || s.Equals("skipped", StringComparison.OrdinalIgnoreCase))
+            return "skipped";
+        if (string.IsNullOrEmpty(s) || s is "—" or "-")
+            return "skipped";
+        return "fail";
     }
 
     private void ApplyLocal(LocalNetViewModel vm)
@@ -736,10 +857,10 @@ public partial class MainWindow : HcWindow
         TargetsList.ItemsSource = vm.CustomPings.Select(p => new CardVm
         {
             Title = p.Label,
-            Badge = ShortState(p.State),
+            Badge = ShortState(lang, p.State),
             Subtitle = p.Detail,
-            AccentBrush = Brush(p.BorderColor),
-            BadgeBg = SoftBrush(p.BorderColor),
+            AccentBrush = StatusBrushes.FromBorderHex(p.BorderColor),
+            BadgeBg = StatusBrushes.FromBorderHex(p.BorderColor, soft: true),
             Url = p.Url ?? (p.Kind == "https" ? p.Target : null),
             TargetKey = p.Kind == "https" ? $"https:{p.Target}" : $"ping:{p.Target}"
         }.WithDensity(_density)).ToList();
@@ -749,29 +870,9 @@ public partial class MainWindow : HcWindow
 
     private void ApplyOverallBadge(string overall)
     {
-        var dark = IsDarkTheme();
-        var key = overall.Trim();
-        var (bg, fg, border) = key switch
-        {
-            "健康" or "healthy" => dark
-                ? ("#1E3A2F", "#81C995", "#34A853")
-                : ("#E6F4EA", "#137333", "#34A853"),
-            "降级" or "degraded" => dark
-                ? ("#3C2F1E", "#FDD663", "#FBBC04")
-                : ("#FEF7E0", "#B06000", "#F9AB00"),
-            _ when key.Contains("异常", StringComparison.Ordinal)
-                || key.Contains("bad", StringComparison.OrdinalIgnoreCase)
-                || key.Contains("失败", StringComparison.Ordinal)
-                => dark
-                    ? ("#3C1F1E", "#F28B82", "#EA4335")
-                    : ("#FCE8E6", "#C5221F", "#EA4335"),
-            _ => dark
-                ? ("#1A2A3C", "#8AB4F8", "#8AB4F8")
-                : ("#E8F0FE", "#1967D2", "#1A73E8")
-        };
-        OverallBadge.Background = Brush(bg);
-        OverallBadge.BorderBrush = Brush(border);
-        OverviewOverallBadge.Foreground = Brush(fg);
+        OverallBadge.Background = StatusBrushes.ForOverall(overall, out var fg, out var border);
+        OverallBadge.BorderBrush = border;
+        OverviewOverallBadge.Foreground = fg;
     }
 
     private static bool IsDarkTheme()
@@ -910,22 +1011,6 @@ public partial class MainWindow : HcWindow
     private static bool LooksLikeUrl(string value) =>
         value.Contains("://", StringComparison.Ordinal) || value.Contains('.', StringComparison.Ordinal);
 
-    private static SolidColorBrush Brush(string hex) =>
-        new((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hex)!);
-
-    private SolidColorBrush SoftBrush(string borderHex)
-    {
-        var dark = IsDarkTheme();
-        return borderHex.ToLowerInvariant() switch
-        {
-            "#34a853" or "#0f9d58" => Brush(dark ? "#1E3A2F" : "#E6F4EA"),
-            "#fbbc04" or "#f9ab00" => Brush(dark ? "#3C2F1E" : "#FEF7E0"),
-            "#ea4335" or "#d93025" => Brush(dark ? "#3C1F1E" : "#FCE8E6"),
-            "#9aa0a6" or "#5f6368" or "#2d323c" => Brush(dark ? "#2A2F38" : "#F1F3F4"),
-            _ => Brush(dark ? "#1A2A3C" : "#E8F0FE")
-        };
-    }
-
     private sealed class CardVm : INotifyPropertyChanged
     {
         private int _density = 3;
@@ -974,6 +1059,9 @@ public partial class MainWindow : HcWindow
         public required string Badge { get; init; }
         public required string Reasons { get; init; }
         public required string Metrics { get; init; }
+        public string Tip { get; init; } = "";
+        public Visibility ReasonsVisibility =>
+            string.IsNullOrWhiteSpace(Reasons) ? Visibility.Collapsed : Visibility.Visible;
         public required System.Windows.Media.Brush AccentBrush { get; init; }
         public required System.Windows.Media.Brush BadgeBg { get; init; }
     }

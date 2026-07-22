@@ -62,6 +62,12 @@
       <ColumnDefinition Width="*"/>
     </Grid.ColumnDefinitions>
 
+    <!-- Growl host (W11b): in-window probe/refresh toasts -->
+    <StackPanel Grid.Column="0" Grid.ColumnSpan="2"
+                VerticalAlignment="Top" HorizontalAlignment="Right"
+                Margin="0,16,16,0" Panel.ZIndex="100"
+                hc:Growl.GrowlParent="True"/>
+
     <!-- Left nav: no hard divider; soft region contrast only -->
     <Border Grid.Column="0" BorderThickness="0"
             Background="{DynamicResource SecondaryRegionBrush}">
@@ -74,9 +80,11 @@
         <Border DockPanel.Dock="Bottom" Margin="12,0,12,16" Padding="0,12,0,0"
                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
           <StackPanel>
-            <Button x:Name="ProbeButton" Content="立即探测"
-                    Style="{StaticResource NsProbeButton}"
-                    Click="Probe_Click"/>
+            <hc:ProgressButton x:Name="ProbeButton" Content="立即探测"
+                              Style="{StaticResource ProgressButtonPrimary}"
+                              Height="42" FontSize="14" FontWeight="SemiBold"
+                              hc:BorderElement.CornerRadius="10"
+                              Click="Probe_Click"/>
             <UniformGrid Columns="2" Margin="0,8,0,0">
               <Button x:Name="RefreshButton" Content="刷新" Margin="0,0,4,0"
                       Style="{StaticResource NsToolButton}"
@@ -95,7 +103,14 @@
           <hc:SideMenuItem x:Name="NavAi" Header="AI / API" Tag="ai"/>
           <hc:SideMenuItem x:Name="NavTargets" Header="自定义目标" Tag="targets"/>
           <hc:SideMenuItem x:Name="NavTrend" Header="历史趋势" Tag="trend"/>
-          <hc:SideMenuItem x:Name="NavAlerts" Header="通知告警" Tag="alerts"/>
+          <hc:SideMenuItem x:Name="NavAlerts" Tag="alerts">
+            <hc:SideMenuItem.Header>
+              <hc:Badge x:Name="AlertsBadge" Value="0" Visibility="Collapsed"
+                        BadgeMargin="0,-6,-10,0">
+                <TextBlock x:Name="NavAlertsText" Text="通知告警" VerticalAlignment="Center"/>
+              </hc:Badge>
+            </hc:SideMenuItem.Header>
+          </hc:SideMenuItem>
           <hc:SideMenuItem x:Name="NavLocal" Header="本机网络" Tag="local"/>
         </hc:SideMenu>
       </DockPanel>
@@ -104,7 +119,8 @@
     <!-- Pages -->
     <Grid Grid.Column="1" Margin="16">
       <!-- Overview -->
-      <ScrollViewer x:Name="PageOverview" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <Grid x:Name="PageOverview">
+      <ScrollViewer x:Name="OverviewScroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel>
           <hc:Card Margin="0,0,0,12" BorderThickness="1" Padding="16">
             <Grid>
@@ -114,9 +130,11 @@
               </Grid.ColumnDefinitions>
               <Border x:Name="OverallBadge" Grid.Column="0" MinWidth="76" Padding="14,10" Margin="0,0,14,0"
                       CornerRadius="10" VerticalAlignment="Top"
-                      Background="#E8F5E9" BorderBrush="#34A853" BorderThickness="1">
+                      Background="{DynamicResource NsStatusOkSoftBrush}"
+                      BorderBrush="{DynamicResource NsStatusOkBrush}" BorderThickness="1">
                 <TextBlock x:Name="OverviewOverallBadge" Text="健康" FontSize="15" FontWeight="Bold"
-                           HorizontalAlignment="Center" Foreground="#137333"/>
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource NsStatusOkBrush}"/>
               </Border>
               <StackPanel Grid.Column="1">
                 <TextBlock x:Name="OverviewTitle" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"/>
@@ -183,8 +201,12 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
-                    <Border MinWidth="108" Padding="10,8" CornerRadius="8"
-                            Background="{DynamicResource RegionBrush}">
+                    <!-- W11c F1: click layer → probe chain -->
+                    <Border MinWidth="108" Padding="10,8" CornerRadius="8" Cursor="Hand"
+                            Background="{DynamicResource RegionBrush}"
+                            MouseLeftButtonUp="LayerCard_Click"
+                            MouseEnter="Card_MouseEnter" MouseLeave="Card_MouseLeave"
+                            ToolTip="{Binding Detail}">
                       <DockPanel>
                         <Border DockPanel.Dock="Left" Width="3" CornerRadius="2" Margin="0,0,10,0"
                                 Background="{Binding AccentBrush}" VerticalAlignment="Stretch"/>
@@ -201,160 +223,57 @@
             </Expander>
           </hc:Card>
 
-          <hc:Card Margin="0,0,0,12" BorderThickness="1" Padding="4,2,4,10">
-            <Expander x:Name="OverviewAiExpander" IsExpanded="True" BorderThickness="0"
-                      Expanded="Section_ExpandedChanged" Collapsed="Section_ExpandedChanged">
-              <Expander.Header>
-                <StackPanel Margin="8,0,0,0">
-                  <TextBlock x:Name="OverviewAiTitle" FontWeight="SemiBold" FontSize="13"/>
-                  <TextBlock x:Name="OverviewAiHint" FontSize="11" Margin="0,3,0,0"
-                             Foreground="{DynamicResource SecondaryTextBrush}" TextWrapping="Wrap"/>
-                </StackPanel>
-              </Expander.Header>
-              <ItemsControl x:Name="OverviewAiList" Margin="8,6,8,0">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <hc:UniformSpacingPanel Orientation="Horizontal" Spacing="10" ChildWrapping="Wrap"/>
-                  </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate>
-                    <hc:Card Width="{Binding RelativeSource={RelativeSource AncestorType=ItemsControl}, Path=Tag}"
-                             MinWidth="160" MaxWidth="420" BorderThickness="1" Padding="14,12"
-                             Cursor="Hand"
-                             MouseLeftButtonUp="Card_MouseLeftButtonUp"
-                             MouseEnter="Card_MouseEnter" MouseLeave="Card_MouseLeave">
-                      <hc:Card.ContextMenu>
-                        <ContextMenu DataContext="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                          <MenuItem Header="打开官网" Click="OpenBrowser_Click" Visibility="{Binding OpenVisible}"/>
-                          <MenuItem Header="复制官网 URL" Click="CopyUrl_Click" Visibility="{Binding OpenVisible}"/>
-                        </ContextMenu>
-                      </hc:Card.ContextMenu>
-                      <StackPanel>
-                        <DockPanel LastChildFill="True">
-                          <hc:Tag DockPanel.Dock="Right" Style="{StaticResource NsStatusTag}" Content="{Binding Badge}"
-                                  Margin="8,0,0,0" Background="{Binding BadgeBg}" Foreground="{Binding AccentBrush}"
-                                  BorderBrush="{Binding AccentBrush}"/>
-                          <StackPanel Orientation="Horizontal">
-                            <Border Width="8" Height="8" CornerRadius="4" Margin="0,0,8,0"
-                                    Background="{Binding AccentBrush}" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold"
-                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                          </StackPanel>
-                        </DockPanel>
-                        <TextBlock Text="{Binding Detail}" Margin="0,10,0,0" FontSize="12"
-                                   Foreground="{DynamicResource SecondaryTextBrush}"
-                                   TextWrapping="Wrap" Visibility="{Binding Level2Visible}"/>
-                        <Border Margin="0,12,0,0" Padding="10,8" CornerRadius="8"
-                                Background="{DynamicResource RegionBrush}"
-                                Visibility="{Binding Level3Visible}">
-                          <Grid>
-                            <Grid.ColumnDefinitions>
-                              <ColumnDefinition Width="*"/>
-                              <ColumnDefinition Width="1"/>
-                              <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" Margin="0,0,10,0">
-                              <TextBlock Text="{Binding DirectLabel}" Style="{StaticResource NsMetricLabel}"/>
-                              <TextBlock Text="{Binding DirectValue}" Style="{StaticResource NsMetricValue}"/>
-                            </StackPanel>
-                            <Border Grid.Column="1" Width="1" Background="{DynamicResource BorderBrush}" Margin="0,2"/>
-                            <StackPanel Grid.Column="2" Margin="10,0,0,0">
-                              <TextBlock Text="{Binding ProxyLabel}" Style="{StaticResource NsMetricLabel}"/>
-                              <TextBlock Text="{Binding ProxyValue}" Style="{StaticResource NsMetricValue}"/>
-                            </StackPanel>
-                          </Grid>
-                        </Border>
-                      </StackPanel>
-                    </hc:Card>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </Expander>
-          </hc:Card>
-
-          <!-- Independent stacked sections: no shared row height -->
-          <hc:Card x:Name="OverviewTargetsExpanderHost" Margin="0,0,0,12" BorderThickness="1" Padding="4,2,4,10">
-            <Expander x:Name="OverviewTargetsExpander" IsExpanded="True" BorderThickness="0"
-                      Expanded="Section_ExpandedChanged" Collapsed="Section_ExpandedChanged">
-              <Expander.Header>
-                <TextBlock x:Name="OverviewTargetsTitle" FontWeight="SemiBold" FontSize="13" Margin="8,0,0,0"/>
-              </Expander.Header>
-              <ItemsControl x:Name="OverviewTargetsList" Margin="8,6,8,0">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <hc:UniformSpacingPanel Orientation="Vertical" Spacing="8"/>
-                  </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate>
-                    <Border Padding="12,10" CornerRadius="8" Cursor="Hand"
-                            Background="{DynamicResource RegionBrush}"
-                            MouseLeftButtonUp="Card_MouseLeftButtonUp"
-                            MouseEnter="Card_MouseEnter" MouseLeave="Card_MouseLeave">
-                      <Border.ContextMenu>
-                        <ContextMenu DataContext="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                          <MenuItem Header="在浏览器打开" Click="OpenBrowser_Click" Visibility="{Binding OpenVisible}"/>
-                          <MenuItem Header="复制 URL" Click="CopyUrl_Click" Visibility="{Binding OpenVisible}"/>
-                        </ContextMenu>
-                      </Border.ContextMenu>
-                      <DockPanel>
-                        <Border DockPanel.Dock="Left" Width="3" CornerRadius="2" Margin="0,0,12,0"
-                                Background="{Binding AccentBrush}" VerticalAlignment="Stretch"/>
-                        <hc:Tag DockPanel.Dock="Right" Style="{StaticResource NsStatusTag}" Content="{Binding Badge}"
-                                Margin="12,0,0,0" Background="{Binding BadgeBg}" Foreground="{Binding AccentBrush}"
-                                BorderBrush="{Binding AccentBrush}" VerticalAlignment="Top"/>
-                        <StackPanel>
-                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"/>
-                          <TextBlock Text="{Binding Subtitle}" Margin="0,4,0,0" FontSize="12"
-                                     Foreground="{DynamicResource SecondaryTextBrush}"
-                                     TextWrapping="Wrap" Visibility="{Binding Level2Visible}"/>
-                        </StackPanel>
-                      </DockPanel>
-                    </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </Expander>
-          </hc:Card>
-
-          <hc:Card x:Name="OverviewLocalExpanderHost" Margin="0,0,0,4" BorderThickness="1" Padding="4,2,4,10">
-            <Expander x:Name="OverviewLocalExpander" IsExpanded="True" BorderThickness="0"
-                      Expanded="Section_ExpandedChanged" Collapsed="Section_ExpandedChanged">
-              <Expander.Header>
-                <TextBlock x:Name="OverviewLocalTitle" FontWeight="SemiBold" FontSize="13" Margin="8,0,0,0"/>
-              </Expander.Header>
-              <StackPanel Margin="8,6,8,0">
-                <ItemsControl x:Name="OverviewLocalList">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <hc:UniformSpacingPanel Orientation="Vertical" Spacing="2"/>
-                    </ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                      <Border Padding="10,8" CornerRadius="6" Background="{DynamicResource RegionBrush}">
-                        <Grid>
-                          <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="100"/>
-                            <ColumnDefinition Width="*"/>
-                          </Grid.ColumnDefinitions>
-                          <TextBlock Grid.Column="0" Text="{Binding Label}"
-                                     Foreground="{DynamicResource SecondaryTextBrush}" FontSize="12"
-                                     VerticalAlignment="Center"/>
-                          <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap"
-                                     FontSize="12" FontWeight="SemiBold"/>
-                        </Grid>
-                      </Border>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <TextBlock x:Name="OverviewProxy" Margin="2,10,2,0" Style="{StaticResource NsMuted}" TextWrapping="Wrap"/>
+          <!-- W11e F5: overview keeps summaries; detail lists live on dedicated pages -->
+          <hc:Card Margin="0,0,0,12" BorderThickness="1" Padding="14,12" Cursor="Hand"
+                   MouseLeftButtonUp="GotoAi_Click" MouseEnter="Card_MouseEnter" MouseLeave="Card_MouseLeave">
+            <DockPanel>
+              <TextBlock x:Name="OverviewAiMore" DockPanel.Dock="Right" Margin="12,0,0,0"
+                         VerticalAlignment="Center" FontSize="11" Cursor="Hand"
+                         Foreground="{DynamicResource PrimaryBrush}" Text="详情 →"/>
+              <StackPanel>
+                <TextBlock x:Name="OverviewAiTitle" FontWeight="SemiBold" FontSize="13"/>
+                <TextBlock x:Name="OverviewAiSummary" Margin="0,6,0,0" FontSize="12"
+                           Foreground="{DynamicResource SecondaryTextBrush}" TextWrapping="Wrap"/>
               </StackPanel>
-            </Expander>
+            </DockPanel>
+          </hc:Card>
+
+          <hc:Card x:Name="OverviewTargetsExpanderHost" Margin="0,0,0,12" BorderThickness="1"
+                   Padding="14,12" Cursor="Hand"
+                   MouseLeftButtonUp="GotoTargets_Click"
+                   MouseEnter="Card_MouseEnter" MouseLeave="Card_MouseLeave">
+            <DockPanel>
+              <TextBlock x:Name="OverviewTargetsMore" DockPanel.Dock="Right" Margin="12,0,0,0"
+                         VerticalAlignment="Center" FontSize="11"
+                         Foreground="{DynamicResource PrimaryBrush}" Text="详情 →"/>
+              <StackPanel>
+                <TextBlock x:Name="OverviewTargetsTitle" FontWeight="SemiBold" FontSize="13"/>
+                <TextBlock x:Name="OverviewTargetsSummary" Margin="0,6,0,0" FontSize="12"
+                           Foreground="{DynamicResource SecondaryTextBrush}" TextWrapping="Wrap"/>
+              </StackPanel>
+            </DockPanel>
+          </hc:Card>
+
+          <hc:Card x:Name="OverviewLocalExpanderHost" Margin="0,0,0,4" BorderThickness="1"
+                   Padding="14,12" Cursor="Hand"
+                   MouseLeftButtonUp="GotoLocal_Click"
+                   MouseEnter="Card_MouseEnter" MouseLeave="Card_MouseLeave">
+            <DockPanel>
+              <TextBlock x:Name="OverviewLocalMore" DockPanel.Dock="Right" Margin="12,0,0,0"
+                         VerticalAlignment="Center" FontSize="11"
+                         Foreground="{DynamicResource PrimaryBrush}" Text="详情 →"/>
+              <StackPanel>
+                <TextBlock x:Name="OverviewLocalTitle" FontWeight="SemiBold" FontSize="13"/>
+                <TextBlock x:Name="OverviewLocalSummary" Margin="0,6,0,0" FontSize="12"
+                           Foreground="{DynamicResource SecondaryTextBrush}" TextWrapping="Wrap"/>
+              </StackPanel>
+            </DockPanel>
           </hc:Card>
         </StackPanel>
       </ScrollViewer>
+      <hc:GotoTop AutoHiding="True" Target="{Binding ElementName=OverviewScroller}"
+                  HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,8,8"/>
+      </Grid>
 
       <!-- Chain -->
       <ScrollViewer x:Name="PageChain" Visibility="Collapsed"
@@ -369,6 +288,7 @@
               <!-- W9f: compact shared-path strip (replaces per-layer ChainList cards) -->
               <TextBlock x:Name="TrunkHint" Margin="0,12,0,6" FontSize="11" FontWeight="SemiBold"
                          Text="公共路径"/>
+              <!-- W11c F2: keep status colors; Poptip restores Reasons/Metrics -->
               <ItemsControl x:Name="TrunkStrip">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
@@ -378,12 +298,19 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
                     <Border Margin="0,0,8,6" Padding="10,6" CornerRadius="8" BorderThickness="1"
-                            BorderBrush="{Binding AccentBrush}" Background="{Binding BadgeBg}">
-                      <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding Badge}" Margin="8,0,0,0" FontSize="11" FontWeight="SemiBold"
-                                   Foreground="{Binding AccentBrush}" VerticalAlignment="Center"/>
+                            BorderBrush="{Binding AccentBrush}" Background="{Binding BadgeBg}"
+                            ToolTip="{Binding Tip}">
+                      <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12"
+                                     VerticalAlignment="Center"/>
+                          <TextBlock Text="{Binding Badge}" Margin="8,0,0,0" FontSize="11" FontWeight="SemiBold"
+                                     Foreground="{Binding AccentBrush}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding Reasons}" Margin="0,3,0,0" FontSize="10" MaxWidth="200"
+                                   TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   Visibility="{Binding ReasonsVisibility}"/>
                       </StackPanel>
                     </Border>
                   </DataTemplate>
@@ -554,7 +481,8 @@
             </StackPanel>
           </DockPanel>
           <Border x:Name="TrendFocusBanner" Margin="0,0,0,12" Padding="10,8" CornerRadius="6"
-                  Background="#331A73E8" BorderBrush="{DynamicResource PrimaryBrush}" BorderThickness="1"
+                  Background="{DynamicResource NsStatusInfoSoftBrush}"
+                  BorderBrush="{DynamicResource PrimaryBrush}" BorderThickness="1"
                   Visibility="Collapsed">
             <TextBlock x:Name="TrendFocusHint" FontSize="12" TextWrapping="Wrap"
                        Foreground="{DynamicResource PrimaryBrush}"/>
@@ -572,13 +500,17 @@
               <!-- ponytail: discrete ok/degraded/fail → heat strip, not line chart -->
               <StackPanel x:Name="TrendLayerStrips"/>
               <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                <Border Width="12" Height="12" Margin="0,0,4,0" Background="#34A853" CornerRadius="2"/>
+                <Border Width="12" Height="12" Margin="0,0,4,0"
+                        Background="{DynamicResource NsStatusOkBrush}" CornerRadius="2"/>
                 <TextBlock x:Name="TrendLegendOk" Text="正常" Margin="0,0,12,0" VerticalAlignment="Center" FontSize="11"/>
-                <Border Width="12" Height="12" Margin="0,0,4,0" Background="#FBBC04" CornerRadius="2"/>
+                <Border Width="12" Height="12" Margin="0,0,4,0"
+                        Background="{DynamicResource NsStatusDegradedBrush}" CornerRadius="2"/>
                 <TextBlock x:Name="TrendLegendDegraded" Text="降级" Margin="0,0,12,0" VerticalAlignment="Center" FontSize="11"/>
-                <Border Width="12" Height="12" Margin="0,0,4,0" Background="#EA4335" CornerRadius="2"/>
+                <Border Width="12" Height="12" Margin="0,0,4,0"
+                        Background="{DynamicResource NsStatusFailBrush}" CornerRadius="2"/>
                 <TextBlock x:Name="TrendLegendFail" Text="失败" Margin="0,0,12,0" VerticalAlignment="Center" FontSize="11"/>
-                <Border Width="12" Height="12" Margin="0,0,4,0" Background="#9AA0A6" CornerRadius="2"/>
+                <Border Width="12" Height="12" Margin="0,0,4,0"
+                        Background="{DynamicResource NsStatusSkippedBrush}" CornerRadius="2"/>
                 <TextBlock x:Name="TrendLegendSkip" Text="跳过/未知" VerticalAlignment="Center" FontSize="11"/>
               </StackPanel>
             </StackPanel>
